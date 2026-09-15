@@ -1,0 +1,4 @@
+-keep class com.oudmon.** { *; }
+-keep class com.glasses.** { *; }
+-dontwarn org.jvcompress.**
+-dontwarn com.anthropic.**
