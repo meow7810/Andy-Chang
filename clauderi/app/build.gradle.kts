@@ -54,4 +54,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     implementation(libs.anthropic.java)
+    // Gmail capability: IMAP with an app password (javax.mail for Android)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
 }

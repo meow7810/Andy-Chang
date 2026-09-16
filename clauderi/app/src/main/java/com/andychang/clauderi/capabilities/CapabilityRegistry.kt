@@ -19,6 +19,7 @@ class CapabilityRegistry(context: Context, private val settings: Settings, val b
         ContactsCapability(context),
         ActionsCapability(context),
         ScreenCapability(context),
+        GmailCapability(context),
     )
 
     fun byId(id: CapabilityId): Capability = all.first { it.id == id }

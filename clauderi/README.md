@@ -34,6 +34,8 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/ContactsCapability.kt      search_contacts
   capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / play_music（Intent）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
+  capabilities/GmailCapability.kt         IMAP（X-GM-RAW 搜尋）search_email / read_email
+  capabilities/PermissionBroker.kt        對話中請求能力：模型呼叫 request_capability，卡片等使用者按允許
   assistant/AssistantEngine.kt       流程：錄音 → STT → 輸入框確認 → LLM(+工具) → 存檔 → TTS
   assistant/ClaudeRiVoiceInteractionService.kt  註冊為預設數位助理（長按 Home）；ProxyRecognitionService 把系統辨識轉給真正的引擎
   ui/                                Compose：對話、能力、設定
@@ -52,6 +54,7 @@ app/src/main/java/com/andychang/clauderi/
 3. **行事曆、聯絡人**：各自獨立開關，開啟時才要 `READ_CALENDAR` / `READ_CONTACTS`。
 4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂，全走系統 Intent。
 5. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
+6. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`。資料夾以 READ_ONLY 開啟，讀信不會標成已讀。
 
 ## 在 Android Studio 建置
 

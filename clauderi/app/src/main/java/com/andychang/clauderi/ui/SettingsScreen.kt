@@ -113,6 +113,15 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         }
 
         HorizontalDivider()
+        Text("Gmail（開啟「Gmail 信箱」能力時使用）", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Google 帳號 → 安全性 → 兩步驟驗證 → 應用程式密碼，新增一組貼在這裡。唯讀，可隨時在 Google 那邊撤銷。",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+        Plain(draft.gmailAddress, "Gmail 帳號") { draft = draft.copy(gmailAddress = it) }
+        Secret(draft.gmailAppPassword, "應用程式密碼（16 碼）") { draft = draft.copy(gmailAppPassword = it) }
+
+        HorizontalDivider()
         Text("記憶與朗讀", style = MaterialTheme.typography.titleMedium)
         Text("對話全部存在手機本地，沒有上限；這裡只決定每次送多少則給模型。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         OutlinedTextField(

@@ -100,7 +100,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                                 CapabilityId.NOTIFICATIONS -> if (!(cap as NotificationCapability).listenerEnabled()) open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                 CapabilityId.SCREEN -> if (!(cap as ScreenCapability).serviceEnabled()) open(SysSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                CapabilityId.ACTIONS -> Unit
+                                CapabilityId.ACTIONS, CapabilityId.GMAIL -> Unit
                             }
                         })
                     }
@@ -128,6 +128,13 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                             }) { Text("再次要求權限") }
                         }
                         CapabilityId.ACTIONS -> Unit
+                        CapabilityId.GMAIL -> if (on) {
+                            val ready = cfg.gmailAddress.isNotBlank() && cfg.gmailAppPassword.isNotBlank()
+                            Text(
+                                if (ready) "已填 ${cfg.gmailAddress}" else "尚未填帳號與應用程式密碼，到「設定」頁填寫",
+                                style = MaterialTheme.typography.bodySmall, color = if (ready) Color.Gray else Color(0xFFFFB74D),
+                            )
+                        }
                     }
                 }
             }

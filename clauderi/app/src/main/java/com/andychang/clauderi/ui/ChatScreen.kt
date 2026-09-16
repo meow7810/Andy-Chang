@@ -56,6 +56,7 @@ import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.assistant.AssistantState
 import com.andychang.clauderi.capabilities.CalendarCapability
 import com.andychang.clauderi.capabilities.ContactsCapability
+import com.andychang.clauderi.capabilities.GmailCapability
 import com.andychang.clauderi.capabilities.NotificationCapability
 import com.andychang.clauderi.capabilities.RequestOutcome
 import com.andychang.clauderi.capabilities.ScreenCapability
@@ -178,13 +179,14 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
     val req = request ?: return
     val scope = rememberCoroutineScope()
     val broker = app.capabilities.broker
+    val cfg by app.settings.flow.collectAsState(initial = AppSettings())
 
     fun finish(systemOk: Boolean) = broker.resolve(if (systemOk) RequestOutcome.GRANTED else RequestOutcome.GRANTED_SYSTEM_PENDING)
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> finish(granted) }
     val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val cap = broker.pending.value?.capability ?: return@rememberLauncherForActivityResult
-        finish(systemReady(app, cap))
+        finish(systemReady(app, cap, cfg))
     }
 
     Card(
@@ -202,13 +204,14 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
                         app.settings.setCapability(req.capability, true)
                         when (req.capability) {
                             CapabilityId.ACTIONS -> finish(true)
+                            CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
                             CapabilityId.CALENDAR -> permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
                             CapabilityId.CONTACTS -> permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
                             CapabilityId.NOTIFICATIONS ->
-                                if (systemReady(app, req.capability)) finish(true)
+                                if (systemReady(app, req.capability, cfg)) finish(true)
                                 else settingsLauncher.launch(Intent(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                             CapabilityId.SCREEN ->
-                                if (systemReady(app, req.capability)) finish(true)
+                                if (systemReady(app, req.capability, cfg)) finish(true)
                                 else settingsLauncher.launch(Intent(SysSettings.ACTION_ACCESSIBILITY_SETTINGS))
                         }
                     }
@@ -219,12 +222,13 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
 }
 
 /** Whether the Android-side permission behind a capability is already in place. */
-private fun systemReady(app: ClaudeRiApp, cap: CapabilityId): Boolean = when (cap) {
+private fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings): Boolean = when (cap) {
     CapabilityId.NOTIFICATIONS -> (app.capabilities.byId(cap) as NotificationCapability).listenerEnabled()
     CapabilityId.SCREEN -> (app.capabilities.byId(cap) as ScreenCapability).serviceEnabled()
     CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).granted()
     CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
     CapabilityId.ACTIONS -> true
+    CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
 }
 
 private fun stateLabel(s: AssistantState) = when (s) {

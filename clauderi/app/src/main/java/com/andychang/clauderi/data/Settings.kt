@@ -28,6 +28,7 @@ enum class CapabilityId(val title: String, val summary: String) {
     CONTACTS("聯絡人", "依姓名查電話"),
     ACTIONS("動作：訊息、鬧鐘、計時器、音樂", "透過系統 Intent 開啟對應 App，不會偷偷送出"),
     SCREEN("螢幕感知（無障礙服務）", "讀取目前畫面上的文字。預設關閉，最後才建議打開"),
+    GMAIL("Gmail 信箱", "用 Google 應用程式密碼透過 IMAP 搜尋與讀信（唯讀，不會標記已讀）"),
 }
 
 data class AppSettings(
@@ -38,6 +39,8 @@ data class AppSettings(
     val customKey: String = "",
     val customBaseUrl: String = "",                // any OpenAI-compatible endpoint, e.g. Gemini / Groq / OpenRouter
     val customModel: String = "",
+    val gmailAddress: String = "",
+    val gmailAppPassword: String = "",              // 16-char Google app password; stored locally only
     val llm: LlmBackend = LlmBackend.CLAUDE,
     val claudeModel: String = "claude-sonnet-5",
     val openAiChatModel: String = "gpt-4o",
@@ -70,6 +73,8 @@ class Settings(private val context: Context) {
             customKey = p[K.customKey] ?: "",
             customBaseUrl = p[K.customBaseUrl] ?: "",
             customModel = p[K.customModel] ?: "",
+            gmailAddress = p[K.gmailAddress] ?: "",
+            gmailAppPassword = p[K.gmailAppPassword] ?: "",
             llm = p[K.llm]?.let { runCatching { LlmBackend.valueOf(it) }.getOrNull() } ?: LlmBackend.CLAUDE,
             claudeModel = p[K.claudeModel] ?: "claude-sonnet-5",
             openAiChatModel = p[K.openAiChatModel] ?: "gpt-4o",
@@ -103,6 +108,8 @@ class Settings(private val context: Context) {
             p[K.customKey] = next.customKey
             p[K.customBaseUrl] = next.customBaseUrl
             p[K.customModel] = next.customModel
+            p[K.gmailAddress] = next.gmailAddress
+            p[K.gmailAppPassword] = next.gmailAppPassword
             p[K.llm] = next.llm.name
             p[K.claudeModel] = next.claudeModel
             p[K.openAiChatModel] = next.openAiChatModel
@@ -135,6 +142,8 @@ class Settings(private val context: Context) {
         val customKey = stringPreferencesKey("custom_key")
         val customBaseUrl = stringPreferencesKey("custom_base_url")
         val customModel = stringPreferencesKey("custom_model")
+        val gmailAddress = stringPreferencesKey("gmail_address")
+        val gmailAppPassword = stringPreferencesKey("gmail_app_password")
         val llm = stringPreferencesKey("llm")
         val claudeModel = stringPreferencesKey("claude_model")
         val openAiChatModel = stringPreferencesKey("openai_chat_model")
