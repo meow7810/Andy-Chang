@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && app.assistant.pendingAssistLaunch.value) {
             app.assistant.pendingAssistLaunch.value = false
-            app.assistant.startVoiceTurn()
+            app.assistant.startVoiceTurn(greet = true)
         }
     }
 
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         if (!fromAssist) return
         intent.removeExtra(EXTRA_START_VOICE)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            app.assistant.startVoiceTurn()
+            app.assistant.startVoiceTurn(greet = true)
         } else {
             app.assistant.pendingAssistLaunch.value = true
             micPermission.launch(Manifest.permission.RECORD_AUDIO)

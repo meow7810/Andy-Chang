@@ -114,7 +114,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("ClaudeRi", style = MaterialTheme.typography.titleMedium)
+            Text("Lord Claude !", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
             Text(stateLabel(state), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }

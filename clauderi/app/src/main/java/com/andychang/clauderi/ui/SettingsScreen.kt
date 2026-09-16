@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.SttBackend
 import kotlinx.coroutines.launch
 
@@ -136,6 +137,19 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("打字提問的回覆也朗讀")
             Switch(checked = draft.speakTextReplies, onCheckedChange = { draft = draft.copy(speakTextReplies = it) })
+        }
+        Text("氣場", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Persona.entries.forEach { p ->
+                FilterChip(selected = draft.persona == p, onClick = { draft = draft.copy(persona = p) }, label = { Text(p.label) })
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("長按 Home 召喚時先說「何事需要驚動本座？」")
+                Text("只在克勞德大人模式有效；會多花約一秒再開始聆聽", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.wakeGreeting, onCheckedChange = { draft = draft.copy(wakeGreeting = it) })
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {

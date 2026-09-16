@@ -11,6 +11,8 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.Persona
+import com.andychang.clauderi.data.Personas
 import com.andychang.clauderi.data.Settings
 import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.data.SttBackend
@@ -98,9 +100,19 @@ class AssistantEngine(
         }
     }
 
-    fun startVoiceTurn() {
+    /** [greet] = summoned via long-press Home: speak the wake line first, then listen. */
+    fun startVoiceTurn(greet: Boolean = false) {
         if (voiceJob?.isActive == true) return
-        voiceJob = scope.launch { runVoiceCapture() }
+        voiceJob = scope.launch {
+            if (greet) {
+                val cfg = settings.current()
+                if (cfg.wakeGreeting && cfg.persona == Persona.LORD) {
+                    _state.value = AssistantState.Speaking(Personas.WAKE_LINE)
+                    speaker.speak(Personas.WAKE_LINE)
+                }
+            }
+            runVoiceCapture()
+        }
     }
 
     fun cancelVoiceTurn() {
@@ -189,8 +201,9 @@ class AssistantEngine(
         val now = SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())
         val caps = capabilities.promptSections(cfg)
         return buildString {
-            append("你是 ClaudeRi，一個在使用者手機上運行的個人助理，使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。")
-            append("回答簡短口語，適合朗讀；需要條列時最多三點。")
+            append(Personas.prompt(cfg.persona))
+            append("\n\n使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。回答簡短，適合朗讀；需要條列時最多三點。")
+            append("\n新增行程時，只要提到地點就一定填 location（完整地址或店名），Google 日曆會據此在該出發時提醒並導航。")
             if (caps.isNotBlank()) {
                 append("\n\n## 目前使用者授權給你的能力\n").append(caps)
                 append("\n\n沒列在上面的能力你都沒有，被問到就直說做不到，不要假裝。")

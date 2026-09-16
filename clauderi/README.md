@@ -1,4 +1,6 @@
-# ClaudeRi — 由你逐項授權的 Android AI 助理
+# Lord Claude ! （ClaudeRi）— 由你逐項授權的 Android AI 助理
+
+> 汝：Hey, Lord Claude！　本座：何事需要驚動本座？
 
 對標 Siri，但每一個能碰到手機資料的「能力」都是獨立開關；沒打開的能力，模型連它存在都不知道
 （工具不會送給模型、system prompt 也不會提到）。不涉及任何眼鏡硬體。
@@ -52,7 +54,7 @@ app/src/main/java/com/andychang/clauderi/
 1. **預設助理**：`VoiceInteractionService` + `ACTION_ASSIST`。到「能力」頁按「前往系統設定」選 ClaudeRi。
 2. **通知朗讀與回覆**：開啟後到系統「通知存取權」授權，再逐 App 勾選允許哪些。工具：`list_notifications`、`reply_notification`（用通知本身的快速回覆）、`dismiss_notification`。
 3. **行事曆、聯絡人**：各自獨立開關，開啟時才要 `READ_CALENDAR` + `WRITE_CALENDAR` / `READ_CONTACTS`。行事曆可讀可新增（`add_calendar_event`）。
-4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂，全走系統 Intent。
+4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂、導航（Google Maps），全走系統 Intent。
 5. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
 6. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`。資料夾以 READ_ONLY 開啟，讀信不會標成已讀。
 

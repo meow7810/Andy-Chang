@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clauderi_settings")
 
+enum class Persona(val label: String) { LORD("克勞德大人"), PLAIN("一般助理") }
 enum class SttBackend(val label: String) { OPENAI("OpenAI gpt-4o-transcribe"), ANDROID("Android 內建（免費）") }
 enum class LlmBackend(val label: String) { CLAUDE("Claude"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen"), CUSTOM("自訂") }
 
@@ -58,6 +59,8 @@ data class AppSettings(
     val notificationApps: Set<String> = emptySet(), // package names allowed for capability NOTIFICATIONS
     val readNotificationsAloud: Boolean = true,
     val allowAiCapabilityRequests: Boolean = true,  // model may ask (in chat) to enable a capability; user still confirms
+    val persona: Persona = Persona.LORD,
+    val wakeGreeting: Boolean = true,               // speak "何事需要驚動本座？" when summoned by long-press Home
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
 }
@@ -93,6 +96,8 @@ class Settings(private val context: Context) {
             notificationApps = p[K.notificationApps] ?: emptySet(),
             readNotificationsAloud = p[K.readNotificationsAloud] ?: true,
             allowAiCapabilityRequests = p[K.allowAiRequests] ?: true,
+            persona = p[K.persona]?.let { runCatching { Persona.valueOf(it) }.getOrNull() } ?: Persona.LORD,
+            wakeGreeting = p[K.wakeGreeting] ?: true,
         )
     }
 
@@ -127,6 +132,8 @@ class Settings(private val context: Context) {
             p[K.notificationApps] = next.notificationApps
             p[K.readNotificationsAloud] = next.readNotificationsAloud
             p[K.allowAiRequests] = next.allowAiCapabilityRequests
+            p[K.persona] = next.persona.name
+            p[K.wakeGreeting] = next.wakeGreeting
         }
     }
 
@@ -161,5 +168,7 @@ class Settings(private val context: Context) {
         val notificationApps = stringSetPreferencesKey("notification_apps")
         val readNotificationsAloud = booleanPreferencesKey("read_notifications_aloud")
         val allowAiRequests = booleanPreferencesKey("allow_ai_requests")
+        val persona = stringPreferencesKey("persona")
+        val wakeGreeting = booleanPreferencesKey("wake_greeting")
     }
 }
