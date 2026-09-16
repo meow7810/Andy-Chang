@@ -183,7 +183,9 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
 
     fun finish(systemOk: Boolean) = broker.resolve(if (systemOk) RequestOutcome.GRANTED else RequestOutcome.GRANTED_SYSTEM_PENDING)
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> finish(granted) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        finish(result.values.all { it })
+    }
     val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val cap = broker.pending.value?.capability ?: return@rememberLauncherForActivityResult
         finish(systemReady(app, cap, cfg))
@@ -205,8 +207,8 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
                         when (req.capability) {
                             CapabilityId.ACTIONS -> finish(true)
                             CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
-                            CapabilityId.CALENDAR -> permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
-                            CapabilityId.CONTACTS -> permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                            CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+                            CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                             CapabilityId.NOTIFICATIONS ->
                                 if (systemReady(app, req.capability, cfg)) finish(true)
                                 else settingsLauncher.launch(Intent(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -225,7 +227,7 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
 private fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings): Boolean = when (cap) {
     CapabilityId.NOTIFICATIONS -> (app.capabilities.byId(cap) as NotificationCapability).listenerEnabled()
     CapabilityId.SCREEN -> (app.capabilities.byId(cap) as ScreenCapability).serviceEnabled()
-    CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).granted()
+    CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).let { it.granted() && it.writeGranted() }
     CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
     CapabilityId.ACTIONS -> true
     CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
@@ -264,6 +266,9 @@ private fun Bubble(m: ChatMessage) {
                     if (m.toolsUsed.isNotEmpty()) append("  🔧 ").append(m.toolsUsed.distinct().joinToString(", "))
                 }
                 Text(meta, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                m.toolErrors.forEach { e ->
+                    Text("⚠ $e", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFB74D))
+                }
             }
         }
     }

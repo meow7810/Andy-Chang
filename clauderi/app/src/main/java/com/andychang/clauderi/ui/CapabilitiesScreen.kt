@@ -96,7 +96,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                         Switch(checked = on, onCheckedChange = { checked ->
                             scope.launch { app.settings.setCapability(cap.id, checked) }
                             if (checked) when (cap.id) {
-                                CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR))
+                                CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
                                 CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                                 CapabilityId.NOTIFICATIONS -> if (!(cap as NotificationCapability).listenerEnabled()) open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                 CapabilityId.SCREEN -> if (!(cap as ScreenCapability).serviceEnabled()) open(SysSettings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -124,7 +124,10 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                         }
                         CapabilityId.CALENDAR, CapabilityId.CONTACTS -> if (on && status.contains("尚未")) {
                             OutlinedButton(onClick = {
-                                permissionLauncher.launch(arrayOf(if (cap.id == CapabilityId.CALENDAR) Manifest.permission.READ_CALENDAR else Manifest.permission.READ_CONTACTS))
+                                permissionLauncher.launch(
+                                    if (cap.id == CapabilityId.CALENDAR) arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                                    else arrayOf(Manifest.permission.READ_CONTACTS),
+                                )
                             }) { Text("再次要求權限") }
                         }
                         CapabilityId.ACTIONS -> Unit

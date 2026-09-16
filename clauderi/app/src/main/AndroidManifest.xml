@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Capability 3: calendar & contacts (runtime permissions, requested only when the capability is switched on) -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Capability 4: alarms / timers go through the clock app's Intent; SET_ALARM is a normal permission -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
