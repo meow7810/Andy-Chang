@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.SttBackend
 import kotlinx.coroutines.launch
 
 /** API keys, model choice, memory depth, speech options. Capability switches live on their own screen. */
@@ -80,10 +81,26 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         }
 
         HorizontalDivider()
-        Text("語音辨識（OpenAI）", style = MaterialTheme.typography.titleMedium)
-        Secret(draft.openAiKey, "OpenAI API key（語音辨識用；選 OpenAI 模型時也用這把）") { draft = draft.copy(openAiKey = it) }
-        Plain(draft.sttModel, "辨識模型（預設 gpt-4o-transcribe）") { draft = draft.copy(sttModel = it) }
-        Plain(draft.languageHint, "語言提示（留空 = 自動偵測中英文）") { draft = draft.copy(languageHint = it) }
+        Text("語音辨識", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SttBackend.entries.forEach { b ->
+                FilterChip(selected = draft.stt == b, onClick = { draft = draft.copy(stt = b) }, label = { Text(b.label) })
+            }
+        }
+        if (draft.stt == SttBackend.OPENAI) {
+            Plain(draft.sttModel, "辨識模型（預設 gpt-4o-transcribe）") { draft = draft.copy(sttModel = it) }
+        } else {
+            Text("用手機自己的辨識引擎（Pixel、多數旗艦可離線），不花 API 額度。中英夾雜準確度略低。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        Plain(draft.languageHint, "語言提示（留空 = 自動偵測中英文；只講中文可填 zh）") { draft = draft.copy(languageHint = it) }
+        Secret(draft.openAiKey, "OpenAI API key（OpenAI 語音辨識或 OpenAI 模型時需要）") { draft = draft.copy(openAiKey = it) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("聽寫鍵盤模式")
+                Text("用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.autoSendTypedInput, onCheckedChange = { draft = draft.copy(autoSendTypedInput = it) })
+        }
 
         HorizontalDivider()
         Text("記憶與朗讀", style = MaterialTheme.typography.titleMedium)

@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.assistant.AssistantState
+import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.llm.Role
@@ -63,6 +64,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
     val messages by app.conversation.messages.collectAsState()
     val state by app.assistant.state.collectAsState()
     val draft by app.assistant.voiceDraft.collectAsState()
+    val cfg by app.settings.flow.collectAsState(initial = AppSettings())
     var input by remember { mutableStateOf("") }
     var pendingSource by remember { mutableStateOf(Source.TEXT) }
     var armed by remember { mutableStateOf(false) }      // auto-send countdown running
@@ -113,7 +115,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
 
         if (armed) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("辨識結果已填入，2 秒內沒動就送出；可直接修改。", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text("2 秒內沒動就送出；可直接修改。", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { armed = false }) { Text("先不要送") }
             }
@@ -128,7 +130,8 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 value = input,
                 onValueChange = { v ->
                     input = v
-                    if (armed) { if (v.isBlank()) armed = false else editTick++ }
+                    if (v.isBlank()) armed = false
+                    else if (armed || cfg.autoSendTypedInput) { armed = true; editTick++ }
                 },
                 modifier = Modifier.weight(1f), maxLines = 4,
                 placeholder = { Text("打字，或按麥克風說話…") },

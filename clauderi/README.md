@@ -7,7 +7,8 @@
 
 - Kotlin + Jetpack Compose，minSdk 26 / compileSdk 35，AGP 8.7、Kotlin 2.0
 - LLM：Anthropic Java SDK 呼叫 Claude（預設 `claude-opus-5`），可切 OpenAI / DeepSeek / Qwen（OpenAI 相容端點，含 function calling）
-- 語音辨識：OpenAI `gpt-4o-transcribe`，語言留空自動偵測中英文
+- 語音辨識：OpenAI `gpt-4o-transcribe`（語言留空自動偵測中英文），或 Android 內建引擎（免費、多數手機可離線）
+- 聽寫鍵盤模式：用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出（你的鍵盤訂閱，不用 API）
 - 辨識結果先填進輸入框，2 秒沒動才送出；期間可修改或按「先不要送」
 - 對話記憶：`conversation.jsonl` 存手機本地，不設上限；送給模型的則數在設定頁調
 - 打字和語音共用同一份記憶；每個能力 = 一組 Claude 工具
@@ -23,6 +24,7 @@ app/src/main/java/com/andychang/clauderi/
   llm/ClaudeChatProvider.kt          Claude + 手動 tool-use 迴圈（adaptive thinking、prompt cache）
   llm/OpenAiChatProvider.kt          OpenAI 相容端點 + function calling 迴圈
   stt/OpenAiSpeechToText.kt          gpt-4o-transcribe
+  stt/AndroidSpeechToText.kt         系統 SpeechRecognizer；SystemRecognizer 找出手機真正的引擎
   audio/MicRecorder.kt               手機麥克風錄 16 kHz PCM，靜音自動停
   audio/Speaker.kt                   系統 TTS 朗讀
   capabilities/Capability.kt         能力介面：promptSection + tools + execute
@@ -33,7 +35,7 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / play_music（Intent）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
   assistant/AssistantEngine.kt       流程：錄音 → STT → 輸入框確認 → LLM(+工具) → 存檔 → TTS
-  assistant/ClaudeRiVoiceInteractionService.kt  註冊為預設數位助理（長按 Home）
+  assistant/ClaudeRiVoiceInteractionService.kt  註冊為預設數位助理（長按 Home）；ProxyRecognitionService 把系統辨識轉給真正的引擎
   ui/                                Compose：對話、能力、設定
 ```
 

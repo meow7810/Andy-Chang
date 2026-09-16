@@ -13,10 +13,12 @@ import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.Settings
 import com.andychang.clauderi.data.Source
+import com.andychang.clauderi.data.SttBackend
 import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ClaudeChatProvider
 import com.andychang.clauderi.llm.OpenAiChatProvider
 import com.andychang.clauderi.llm.Role
+import com.andychang.clauderi.stt.AndroidSpeechToText
 import com.andychang.clauderi.stt.OpenAiSpeechToText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +64,7 @@ class AssistantEngine(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val speaker = Speaker(context)
     private val recorder = MicRecorder(context)
+    private val androidStt = AndroidSpeechToText(context)
     private val turnMutex = Mutex()
     private var voiceJob: Job? = null
 
@@ -123,15 +126,19 @@ class AssistantEngine(
 
     private suspend fun runVoiceCapture() {
         val cfg = settings.current()
-        if (cfg.openAiKey.isBlank()) { _state.value = AssistantState.Error("語音辨識需要 OpenAI API key（設定頁）"); return }
-        val stt = OpenAiSpeechToText(cfg.openAiKey, cfg.sttModel)
         try {
             speaker.stop()
             _state.value = AssistantState.Listening
-            val rec = recorder.record()
-            if (rec.durationMs < 400) { _state.value = AssistantState.Idle; return }
-            _state.value = AssistantState.Transcribing
-            val text = stt.transcribe(rec.wav, cfg.languageHint.ifBlank { null })
+            val text = when (cfg.stt) {
+                SttBackend.ANDROID -> androidStt.listen(cfg.languageHint.ifBlank { null })
+                SttBackend.OPENAI -> {
+                    if (cfg.openAiKey.isBlank()) { _state.value = AssistantState.Error("OpenAI 語音辨識需要 API key（設定頁），或改用 Android 內建辨識"); return }
+                    val rec = recorder.record()
+                    if (rec.durationMs < 400) { _state.value = AssistantState.Idle; return }
+                    _state.value = AssistantState.Transcribing
+                    OpenAiSpeechToText(cfg.openAiKey, cfg.sttModel).transcribe(rec.wav, cfg.languageHint.ifBlank { null })
+                }
+            }
             _state.value = AssistantState.Idle
             if (text.isNotBlank()) _voiceDraft.value = VoiceDraft(text)
         } catch (e: Exception) {

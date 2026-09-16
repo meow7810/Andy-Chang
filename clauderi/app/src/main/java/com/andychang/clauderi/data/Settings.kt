@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clauderi_settings")
 
+enum class SttBackend(val label: String) { OPENAI("OpenAI gpt-4o-transcribe"), ANDROID("Android 內建（免費）") }
 enum class LlmBackend(val label: String) { CLAUDE("Claude"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen") }
 
 /**
@@ -39,11 +40,13 @@ data class AppSettings(
     val openAiChatModel: String = "gpt-4o",
     val deepSeekModel: String = "deepseek-chat",
     val qwenModel: String = "qwen-plus",
+    val stt: SttBackend = SttBackend.OPENAI,
     val sttModel: String = "gpt-4o-transcribe",
     val languageHint: String = "",                 // empty = auto-detect (zh / en mixed)
     val historyTurns: Int = 40,                    // messages sent to the model per turn; local memory is unlimited
     val speakVoiceReplies: Boolean = true,         // read the reply aloud when the question came in by voice
     val speakTextReplies: Boolean = false,
+    val autoSendTypedInput: Boolean = false,       // dictation-keyboard mode: any typed input auto-sends after 2 s idle
     val customInstructions: String = "",
     val enabledCapabilities: Set<CapabilityId> = emptySet(),
     val notificationApps: Set<String> = emptySet(), // package names allowed for capability NOTIFICATIONS
@@ -65,11 +68,13 @@ class Settings(private val context: Context) {
             openAiChatModel = p[K.openAiChatModel] ?: "gpt-4o",
             deepSeekModel = p[K.deepSeekModel] ?: "deepseek-chat",
             qwenModel = p[K.qwenModel] ?: "qwen-plus",
+            stt = p[K.stt]?.let { runCatching { SttBackend.valueOf(it) }.getOrNull() } ?: SttBackend.OPENAI,
             sttModel = p[K.sttModel] ?: "gpt-4o-transcribe",
             languageHint = p[K.language] ?: "",
             historyTurns = p[K.historyTurns] ?: 40,
             speakVoiceReplies = p[K.speakVoice] ?: true,
             speakTextReplies = p[K.speakText] ?: false,
+            autoSendTypedInput = p[K.autoSendTyped] ?: false,
             customInstructions = p[K.customInstructions] ?: "",
             enabledCapabilities = (p[K.capabilities] ?: emptySet())
                 .mapNotNull { runCatching { CapabilityId.valueOf(it) }.getOrNull() }.toSet(),
@@ -92,11 +97,13 @@ class Settings(private val context: Context) {
             p[K.openAiChatModel] = next.openAiChatModel
             p[K.deepSeekModel] = next.deepSeekModel
             p[K.qwenModel] = next.qwenModel
+            p[K.stt] = next.stt.name
             p[K.sttModel] = next.sttModel
             p[K.language] = next.languageHint
             p[K.historyTurns] = next.historyTurns
             p[K.speakVoice] = next.speakVoiceReplies
             p[K.speakText] = next.speakTextReplies
+            p[K.autoSendTyped] = next.autoSendTypedInput
             p[K.customInstructions] = next.customInstructions
             p[K.capabilities] = next.enabledCapabilities.map { it.name }.toSet()
             p[K.notificationApps] = next.notificationApps
@@ -118,11 +125,13 @@ class Settings(private val context: Context) {
         val openAiChatModel = stringPreferencesKey("openai_chat_model")
         val deepSeekModel = stringPreferencesKey("deepseek_model")
         val qwenModel = stringPreferencesKey("qwen_model")
+        val stt = stringPreferencesKey("stt")
         val sttModel = stringPreferencesKey("stt_model")
         val language = stringPreferencesKey("language")
         val historyTurns = intPreferencesKey("history_turns")
         val speakVoice = booleanPreferencesKey("speak_voice")
         val speakText = booleanPreferencesKey("speak_text")
+        val autoSendTyped = booleanPreferencesKey("auto_send_typed")
         val customInstructions = stringPreferencesKey("custom_instructions")
         val capabilities = stringSetPreferencesKey("capabilities")
         val notificationApps = stringSetPreferencesKey("notification_apps")
