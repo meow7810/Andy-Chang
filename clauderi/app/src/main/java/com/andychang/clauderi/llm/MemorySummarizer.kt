@@ -17,8 +17,8 @@ interface MemorySummarizer {
     suspend fun summarize(prompt: String): String
     /** Submit for asynchronous processing; returns a job id, or null if this backend has no batch mode. */
     suspend fun submit(prompt: String): String? = null
-    /** Poll a job: the summary once finished, null while still running. Throws if the job failed. */
-    suspend fun poll(jobId: String): String? = null
+    /** Poll a job: the summary once finished, null while still running. Throws if the job failed or is unsupported here. */
+    suspend fun poll(jobId: String): String? = throw LlmException("this backend has no batch jobs; dropping $jobId")
 }
 
 /** Any chat backend can summarise directly (no batch). */

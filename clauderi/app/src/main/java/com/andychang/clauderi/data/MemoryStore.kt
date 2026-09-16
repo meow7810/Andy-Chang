@@ -41,7 +41,7 @@ class MemoryStore(context: Context) {
 
     /** A batch job submitted earlier and not yet applied: job id and the message id it covers. */
     @Volatile private var pendingJob: String? = load().third
-    @Volatile private var pendingUpTo: Long = 0L
+    @Volatile private var pendingUpTo: Long = load().fourth
 
     private val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.TAIWAN)
 
@@ -49,18 +49,19 @@ class MemoryStore(context: Context) {
         val line = "- （${fmt.format(Date())}，使用者要求記住）${note.trim()}"
         val next = (_text.value.trimEnd() + "\n" + line).trim()
         _text.value = next
-        save(next, summarizedUpTo, pendingJob)
+        save(next, summarizedUpTo, pendingJob, pendingUpTo)
     }
 
     suspend fun replace(newText: String) = mutex.withLock {
         _text.value = newText.trim()
-        save(_text.value, summarizedUpTo, pendingJob)
+        save(_text.value, summarizedUpTo, pendingJob, pendingUpTo)
     }
 
     suspend fun clear() = mutex.withLock {
         _text.value = ""
         summarizedUpTo = 0
         pendingJob = null
+        pendingUpTo = 0
         file.delete()
     }
 
@@ -95,7 +96,7 @@ class MemoryStore(context: Context) {
             if (job != null) {
                 pendingJob = job
                 pendingUpTo = chunk.last().id
-                mutex.withLock { save(_text.value, summarizedUpTo, job) }
+                mutex.withLock { save(_text.value, summarizedUpTo, job, pendingUpTo) }
                 Log.i(TAG, "memory compaction submitted as batch $job")
             } else {
                 apply(summarizer.summarize(prompt), chunk.last().id)
@@ -113,7 +114,7 @@ class MemoryStore(context: Context) {
         mutex.withLock {
             _text.value = clean.take(4000)
             summarizedUpTo = maxOf(summarizedUpTo, upTo)
-            save(_text.value, summarizedUpTo, null)
+            save(_text.value, summarizedUpTo, null, 0L)
         }
         Log.i(TAG, "memory compacted up to message $upTo")
     }
@@ -133,16 +134,20 @@ class MemoryStore(context: Context) {
         }
     }
 
-    private fun load(): Triple<String, Long, String?> {
-        if (!file.exists()) return Triple("", 0L, null)
-        return runCatching {
-            val o = JSONObject(file.readText())
-            Triple(o.optString("text", ""), o.optLong("upTo", 0L), o.optString("job", "").ifBlank { null })
-        }.getOrDefault(Triple("", 0L, null))
+    private data class Saved(val text: String, val upTo: Long, val job: String?, val pendingUpTo: Long) {
+        val first get() = text; val second get() = upTo; val third get() = job; val fourth get() = pendingUpTo
     }
 
-    private fun save(text: String, upTo: Long, job: String?) {
-        file.writeText(JSONObject().put("text", text).put("upTo", upTo).put("job", job ?: "").toString())
+    private fun load(): Saved {
+        if (!file.exists()) return Saved("", 0L, null, 0L)
+        return runCatching {
+            val o = JSONObject(file.readText())
+            Saved(o.optString("text", ""), o.optLong("upTo", 0L), o.optString("job", "").ifBlank { null }, o.optLong("pendingUpTo", 0L))
+        }.getOrDefault(Saved("", 0L, null, 0L))
+    }
+
+    private fun save(text: String, upTo: Long, job: String?, pendingUpTo: Long) {
+        file.writeText(JSONObject().put("text", text).put("upTo", upTo).put("job", job ?: "").put("pendingUpTo", pendingUpTo).toString())
     }
 
     companion object { private const val TAG = "MemoryStore" }

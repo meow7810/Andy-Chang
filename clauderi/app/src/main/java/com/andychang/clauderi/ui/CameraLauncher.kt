@@ -19,7 +19,7 @@ internal fun CameraLauncher(app: ClaudeRiApp) {
     val request by app.capabilities.camera.pending.collectAsState()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> app.capabilities.camera.onPhotoResult(ok) }
     LaunchedEffect(request) {
-        request?.let { launcher.launch(it.target) }
+        request?.takeIf { !it.done.isCompleted }?.let { launcher.launch(it.target) }
     }
     request?.let { req ->
         if (req.hint.isNotBlank()) {

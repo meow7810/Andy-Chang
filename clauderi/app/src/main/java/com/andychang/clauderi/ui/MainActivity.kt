@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
@@ -55,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 Surface(color = MaterialTheme.colorScheme.background) { Root(app) }
             }
         }
-        handleIntent(intent)
+        if (savedInstanceState == null) handleIntent(intent)   // not again on rotation / restore
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -104,11 +105,17 @@ private fun Root(app: ClaudeRiApp) {
             }
         },
     ) { padding ->
-        val m = Modifier.padding(padding)
-        when (tab) {
-            Tab.CHAT -> ChatScreen(app, m)
-            Tab.CAPABILITIES -> CapabilitiesScreen(app, m)
-            Tab.SETTINGS -> SettingsScreen(app, m)
+        Column(Modifier.padding(padding)) {
+            // Always composed, whatever tab is showing: a tool waiting on the user must not be
+            // invisible just because they are on the settings screen.
+            CapabilityRequestCard(app)
+            CameraLauncher(app)
+            val m = Modifier.weight(1f)
+            when (tab) {
+                Tab.CHAT -> ChatScreen(app, m)
+                Tab.CAPABILITIES -> CapabilitiesScreen(app, m)
+                Tab.SETTINGS -> SettingsScreen(app, m)
+            }
         }
     }
 }

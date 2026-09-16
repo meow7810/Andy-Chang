@@ -43,8 +43,10 @@ class OpenAiChatProvider(
 
             val calls = message.optJSONArray("tool_calls")
             if (calls == null || calls.length() == 0) {
-                return@withContext ChatReply(message.optString("content").trim(), used)
+                val content = if (message.isNull("content")) "" else message.optString("content")
+                return@withContext ChatReply(content.trim(), used)
             }
+            val imageFollowUps = mutableListOf<JSONObject>()
             for (i in 0 until calls.length()) {
                 val c = calls.getJSONObject(i)
                 val fn = c.getJSONObject("function")
@@ -57,18 +59,17 @@ class OpenAiChatProvider(
                         .put("content", if (r.isError) "ERROR: ${r.text}" else r.text),
                 )
                 r.imageJpeg?.let { jpeg ->
-                    // OpenAI-style tool messages cannot carry images; send it as the next user turn.
+                    // OpenAI-style tool messages cannot carry images; send it as a user turn after all tool results.
                     val dataUrl = "data:image/jpeg;base64," + android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP)
-                    messages.put(
-                        JSONObject().put("role", "user").put(
-                            "content",
-                            JSONArray()
-                                .put(JSONObject().put("type", "text").put("text", "（這是剛拍的照片）"))
-                                .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", dataUrl))),
-                        ),
+                    imageFollowUps += JSONObject().put("role", "user").put(
+                        "content",
+                        JSONArray()
+                            .put(JSONObject().put("type", "text").put("text", "（這是剛拍的照片）"))
+                            .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", dataUrl))),
                     )
                 }
             }
+            imageFollowUps.forEach { messages.put(it) }
         }
         ChatReply("（工具呼叫太多次，先停在這裡。）", used)
     }

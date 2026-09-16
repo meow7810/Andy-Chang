@@ -107,9 +107,6 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             items(messages, key = { it.id }) { Bubble(it) }
         }
 
-        CapabilityRequestCard(app)
-        CameraLauncher(app)
-
         if (armed) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("2 秒內沒動就送出；可直接修改。", style = MaterialTheme.typography.labelSmall, color = Color.Gray)

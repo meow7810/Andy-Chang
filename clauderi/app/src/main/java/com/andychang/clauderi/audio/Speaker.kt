@@ -31,6 +31,7 @@ class Speaker(context: Context) {
         )
         val id = UUID.randomUUID().toString()
         suspendCancellableCoroutine<Unit> { cont ->
+            tts.stop()   // lets a previous speak() still awaiting receive onStop and resume
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(utteranceId: String?) { if (utteranceId == id && cont.isActive) cont.resume(Unit) }

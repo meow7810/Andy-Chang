@@ -113,6 +113,7 @@ class AssistantEngine(
             if (greet) {
                 val cfg = settings.current()
                 if (cfg.wakeGreeting && cfg.persona == Persona.LORD) {
+                    speaker.stop()
                     _state.value = AssistantState.Speaking(Personas.WAKE_LINE)
                     speaker.speak(Personas.WAKE_LINE)
                 }
@@ -195,12 +196,13 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
+        val replyText = reply.text.ifBlank { "（本座無話可說。）" }
+        store.append(Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
         if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
         if (speakReply && reply.text.isNotBlank()) {
-            _state.value = AssistantState.Speaking(reply.text)
-            speaker.speak(reply.text)
+            _state.value = AssistantState.Speaking(replyText)
+            speaker.speak(replyText)
         }
         _state.value = AssistantState.Idle
     }
