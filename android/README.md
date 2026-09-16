@@ -23,7 +23,7 @@
                                           網路 (OpenAI / Anthropic / Typeless)
 ```
 
-## 專案結構（`android/`）
+## 專案結構（本目錄 `android/`）
 
 ```
 app/libs/glasses_sdk_20250723_v01.aar   原廠 Android BLE SDK（QCSDK）
@@ -44,7 +44,7 @@ app/src/main/java/com/andychang/cyanmind/
 
 ## 建置
 
-1. 用 Android Studio 開啟 `android/` 目錄（AGP 8.7、Kotlin 2.0、compileSdk 35、minSdk 26）。
+1. 用 Android Studio 開啟這個 `android/` 目錄（AGP 8.7、Kotlin 2.0、compileSdk 35、minSdk 26）。
 2. 直接 Run 到實機（BLE 和藍牙音訊模擬器都跑不了）。
 3. 手機 **系統藍牙設定** 先跟眼鏡配對一次（這一步負責 HFP/A2DP 音訊）。
 4. App 內「眼鏡」分頁掃描並連線（這一步負責 BLE 控制指令）。
