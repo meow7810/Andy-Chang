@@ -71,7 +71,11 @@ class OpenAiChatProvider(
             }
             imageFollowUps.forEach { messages.put(it) }
         }
-        ChatReply("（工具呼叫太多次，先停在這裡。）", used)
+        // Round cap reached: one last call without tools so the model wraps up in its own voice.
+        messages.put(JSONObject().put("role", "user").put("content", "（系統：這一輪的工具呼叫次數已達上限，先不要再呼叫工具。用你的口吻告訴使用者目前進度、還剩什麼，問要不要繼續。）"))
+        val last = post(JSONObject().put("model", model).put("messages", messages))
+        val content = if (last.isNull("content")) "" else last.optString("content")
+        ChatReply(content.trim(), used)
     }
 
     private fun toolsJson(tools: List<ToolSpec>): JSONArray = JSONArray().also { arr ->

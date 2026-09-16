@@ -106,7 +106,20 @@ class ClaudeChatProvider(
             }
             messages += MessageParam.builder().role(MessageParam.Role.USER).contentOfBlockParams(results).build()
         }
-        ChatReply("（工具呼叫太多次，先停在這裡。）", used)
+        // Round cap reached: one last call with no tools, so the model wraps up in its own voice
+        // (progress so far, what is left) instead of a canned line.
+        val closing = MessageCreateParams.builder()
+            .model(model).maxTokens(maxTokens)
+            .thinking(ThinkingConfigAdaptive.builder().build())
+            .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
+            .systemOfTextBlockParams(systemBlocks(systemPrompt()))
+            .messages(messages + MessageParam.builder().role(MessageParam.Role.USER)
+                .content("（系統：這一輪的工具呼叫次數已達上限，先不要再呼叫工具。用你的口吻告訴使用者目前進度、還剩什麼，問要不要繼續。）").build())
+            .build()
+        val last = try { client.messages().create(closing) } catch (e: AnthropicServiceException) {
+            throw LlmException("Claude API error ${e.statusCode()}: ${e.message}", e)
+        }
+        ChatReply(last.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim(), used)
     }
 
     /** Stable text first with the cache breakpoint; volatile text (memory, clock) after it, uncached. */
