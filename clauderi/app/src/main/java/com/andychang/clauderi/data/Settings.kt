@@ -54,6 +54,7 @@ data class AppSettings(
     val enabledCapabilities: Set<CapabilityId> = emptySet(),
     val notificationApps: Set<String> = emptySet(), // package names allowed for capability NOTIFICATIONS
     val readNotificationsAloud: Boolean = true,
+    val allowAiCapabilityRequests: Boolean = true,  // model may ask (in chat) to enable a capability; user still confirms
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
 }
@@ -86,6 +87,7 @@ class Settings(private val context: Context) {
                 .mapNotNull { runCatching { CapabilityId.valueOf(it) }.getOrNull() }.toSet(),
             notificationApps = p[K.notificationApps] ?: emptySet(),
             readNotificationsAloud = p[K.readNotificationsAloud] ?: true,
+            allowAiCapabilityRequests = p[K.allowAiRequests] ?: true,
         )
     }
 
@@ -117,6 +119,7 @@ class Settings(private val context: Context) {
             p[K.capabilities] = next.enabledCapabilities.map { it.name }.toSet()
             p[K.notificationApps] = next.notificationApps
             p[K.readNotificationsAloud] = next.readNotificationsAloud
+            p[K.allowAiRequests] = next.allowAiCapabilityRequests
         }
     }
 
@@ -148,5 +151,6 @@ class Settings(private val context: Context) {
         val capabilities = stringSetPreferencesKey("capabilities")
         val notificationApps = stringSetPreferencesKey("notification_apps")
         val readNotificationsAloud = booleanPreferencesKey("read_notifications_aloud")
+        val allowAiRequests = booleanPreferencesKey("allow_ai_requests")
     }
 }

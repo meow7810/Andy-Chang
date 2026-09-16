@@ -49,10 +49,14 @@ data class ChatReply(val text: String, val toolsUsed: List<String>)
  */
 interface ChatProvider {
     val id: String
+    /**
+     * [systemPrompt] and [tools] are re-evaluated before every round of the tool loop, so a
+     * capability the user grants mid-turn (via request_capability) is available on the next round.
+     */
     suspend fun reply(
-        systemPrompt: String,
+        systemPrompt: suspend () -> String,
         history: List<ChatTurn>,
-        tools: List<ToolSpec>,
+        tools: suspend () -> List<ToolSpec>,
         executor: ToolExecutor,
     ): ChatReply
 }

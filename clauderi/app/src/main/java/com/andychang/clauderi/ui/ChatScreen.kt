@@ -1,7 +1,11 @@
 package com.andychang.clauderi.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings as SysSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,11 +54,18 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.assistant.AssistantState
+import com.andychang.clauderi.capabilities.CalendarCapability
+import com.andychang.clauderi.capabilities.ContactsCapability
+import com.andychang.clauderi.capabilities.NotificationCapability
+import com.andychang.clauderi.capabilities.RequestOutcome
+import com.andychang.clauderi.capabilities.ScreenCapability
+import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.llm.Role
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val AUTO_SEND_DELAY_MS = 2_000L
 
@@ -113,6 +128,8 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             items(messages, key = { it.id }) { Bubble(it) }
         }
 
+        CapabilityRequestCard(app)
+
         if (armed) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("2 秒內沒動就送出；可直接修改。", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -147,6 +164,67 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/**
+ * The in-chat permission prompt. The model asked for a capability via request_capability and is
+ * now blocked waiting; the user decides here. 允許 flips the app switch and, where Android needs
+ * it, runs the system permission dialog (calendar / contacts) or opens the system settings page
+ * (notification access / accessibility) before answering the model.
+ */
+@Composable
+private fun CapabilityRequestCard(app: ClaudeRiApp) {
+    val request by app.capabilities.broker.pending.collectAsState()
+    val req = request ?: return
+    val scope = rememberCoroutineScope()
+    val broker = app.capabilities.broker
+
+    fun finish(systemOk: Boolean) = broker.resolve(if (systemOk) RequestOutcome.GRANTED else RequestOutcome.GRANTED_SYSTEM_PENDING)
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> finish(granted) }
+    val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val cap = broker.pending.value?.capability ?: return@rememberLauncherForActivityResult
+        finish(systemReady(app, cap))
+    }
+
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("ClaudeRi 想開啟「${req.capability.title}」", style = MaterialTheme.typography.titleSmall)
+            Text(req.reason, style = MaterialTheme.typography.bodyMedium)
+            Text(req.capability.summary, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { broker.resolve(RequestOutcome.DENIED) }) { Text("拒絕") }
+                Button(onClick = {
+                    scope.launch {
+                        app.settings.setCapability(req.capability, true)
+                        when (req.capability) {
+                            CapabilityId.ACTIONS -> finish(true)
+                            CapabilityId.CALENDAR -> permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                            CapabilityId.CONTACTS -> permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                            CapabilityId.NOTIFICATIONS ->
+                                if (systemReady(app, req.capability)) finish(true)
+                                else settingsLauncher.launch(Intent(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            CapabilityId.SCREEN ->
+                                if (systemReady(app, req.capability)) finish(true)
+                                else settingsLauncher.launch(Intent(SysSettings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                    }
+                }) { Text("允許") }
+            }
+        }
+    }
+}
+
+/** Whether the Android-side permission behind a capability is already in place. */
+private fun systemReady(app: ClaudeRiApp, cap: CapabilityId): Boolean = when (cap) {
+    CapabilityId.NOTIFICATIONS -> (app.capabilities.byId(cap) as NotificationCapability).listenerEnabled()
+    CapabilityId.SCREEN -> (app.capabilities.byId(cap) as ScreenCapability).serviceEnabled()
+    CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).granted()
+    CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
+    CapabilityId.ACTIONS -> true
 }
 
 private fun stateLabel(s: AssistantState) = when (s) {

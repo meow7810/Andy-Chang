@@ -128,6 +128,13 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Text("打字提問的回覆也朗讀")
             Switch(checked = draft.speakTextReplies, onCheckedChange = { draft = draft.copy(speakTextReplies = it) })
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("允許 AI 在對話中請求能力")
+                Text("模型會知道有哪些能力可以請求；開關仍由你在卡片上按允許才打開", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.allowAiCapabilityRequests, onCheckedChange = { draft = draft.copy(allowAiCapabilityRequests = it) })
+        }
         OutlinedTextField(
             draft.customInstructions, { draft = draft.copy(customInstructions = it) },
             label = { Text("額外指示（例如：我是交易員，回答用台灣用語）") }, modifier = Modifier.fillMaxWidth(), minLines = 3,

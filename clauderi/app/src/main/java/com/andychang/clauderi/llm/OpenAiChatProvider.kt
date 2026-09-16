@@ -25,30 +25,17 @@ class OpenAiChatProvider(
 ) : ChatProvider {
 
     override suspend fun reply(
-        systemPrompt: String, history: List<ChatTurn>, tools: List<ToolSpec>, executor: ToolExecutor,
+        systemPrompt: suspend () -> String, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
     ): ChatReply = withContext(Dispatchers.IO) {
-        val messages = JSONArray().put(JSONObject().put("role", "system").put("content", systemPrompt))
+        val messages = JSONArray().put(JSONObject().put("role", "system").put("content", ""))
         for (t in history) {
             messages.put(JSONObject().put("role", if (t.role == Role.USER) "user" else "assistant").put("content", t.text))
-        }
-        val toolsJson = JSONArray().also { arr ->
-            tools.forEach { spec ->
-                arr.put(
-                    JSONObject().put("type", "function").put(
-                        "function",
-                        JSONObject().put("name", spec.name).put("description", spec.description).put(
-                            "parameters",
-                            JSONObject().put("type", "object")
-                                .put("properties", spec.schemaProperties())
-                                .put("required", JSONArray(spec.requiredNames())),
-                        ),
-                    ),
-                )
-            }
         }
         val used = mutableListOf<String>()
 
         repeat(MAX_TOOL_ROUNDS) {
+            messages.getJSONObject(0).put("content", systemPrompt())
+            val toolsJson = toolsJson(tools())
             val payload = JSONObject().put("model", model).put("messages", messages)
             if (toolsJson.length() > 0) payload.put("tools", toolsJson)
             val message = post(payload)
@@ -72,6 +59,22 @@ class OpenAiChatProvider(
             }
         }
         ChatReply("（工具呼叫太多次，先停在這裡。）", used)
+    }
+
+    private fun toolsJson(tools: List<ToolSpec>): JSONArray = JSONArray().also { arr ->
+        tools.forEach { spec ->
+            arr.put(
+                JSONObject().put("type", "function").put(
+                    "function",
+                    JSONObject().put("name", spec.name).put("description", spec.description).put(
+                        "parameters",
+                        JSONObject().put("type", "object")
+                            .put("properties", spec.schemaProperties())
+                            .put("required", JSONArray(spec.requiredNames())),
+                    ),
+                ),
+            )
+        }
     }
 
     private fun post(payload: JSONObject): JSONObject {

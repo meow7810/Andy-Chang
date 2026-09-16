@@ -38,7 +38,7 @@ class ClaudeChatProvider(
     private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
 
     override suspend fun reply(
-        systemPrompt: String, history: List<ChatTurn>, tools: List<ToolSpec>, executor: ToolExecutor,
+        systemPrompt: suspend () -> String, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
     ): ChatReply = withContext(Dispatchers.IO) {
         val messages = history.map { turn ->
             MessageParam.builder()
@@ -46,10 +46,10 @@ class ClaudeChatProvider(
                 .content(turn.text)
                 .build()
         }.toMutableList()
-        val sdkTools = tools.map { toSdkTool(it) }
         val used = mutableListOf<String>()
 
         repeat(MAX_TOOL_ROUNDS) {
+            val sdkTools = tools().map { toSdkTool(it) }
             val builder = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(maxTokens)
@@ -58,7 +58,7 @@ class ClaudeChatProvider(
                 .systemOfTextBlockParams(
                     listOf(
                         TextBlockParam.builder()
-                            .text(systemPrompt)
+                            .text(systemPrompt())
                             .cacheControl(CacheControlEphemeral.builder().build())
                             .build(),
                     ),

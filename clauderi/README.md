@@ -39,6 +39,12 @@ app/src/main/java/com/andychang/clauderi/
   ui/                                Compose：對話、能力、設定
 ```
 
+## 在對話中授權
+
+模型看得到「有哪些能力可以請求」（只有名稱），但拿不到工具。需要時它呼叫 `request_capability`，
+對話裡跳出卡片，你按「允許」才打開，行事曆 / 聯絡人的系統權限框直接跳在 App 內，
+通知 / 螢幕感知則會帶你到系統設定頁再回來。設定頁可以整個關掉這個功能。
+
 ## 第一版能力（照順序）
 
 1. **預設助理**：`VoiceInteractionService` + `ACTION_ASSIST`。到「能力」頁按「前往系統設定」選 ClaudeRi。

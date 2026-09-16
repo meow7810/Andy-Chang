@@ -159,10 +159,10 @@ class AssistantEngine(
 
         val reply = try {
             llm.reply(
-                systemPrompt = buildSystemPrompt(cfg),
+                systemPrompt = { buildSystemPrompt(settings.current()) },
                 history = store.recentTurns(cfg.historyTurns),
-                tools = capabilities.tools(cfg),
-                executor = capabilities.executor(cfg),
+                tools = { capabilities.tools(settings.current()) },
+                executor = capabilities.executor(),
             )
         } catch (e: Exception) {
             Log.e(TAG, "llm failed", e)

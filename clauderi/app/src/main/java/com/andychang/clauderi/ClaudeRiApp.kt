@@ -3,6 +3,7 @@ package com.andychang.clauderi
 import android.app.Application
 import com.andychang.clauderi.assistant.AssistantEngine
 import com.andychang.clauderi.capabilities.CapabilityRegistry
+import com.andychang.clauderi.capabilities.PermissionBroker
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.Settings
 
@@ -17,7 +18,7 @@ class ClaudeRiApp : Application() {
         super.onCreate()
         settings = Settings(this)
         conversation = ConversationStore(this)
-        capabilities = CapabilityRegistry(this)
+        capabilities = CapabilityRegistry(this, settings, PermissionBroker())
         assistant = AssistantEngine(this, settings, conversation, capabilities)
         assistant.start()
     }
