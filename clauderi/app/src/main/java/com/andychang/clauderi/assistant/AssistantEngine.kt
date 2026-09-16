@@ -214,7 +214,8 @@ class AssistantEngine(
         val caps = capabilities.promptSections(cfg)
         val stable = buildString {
             append(Personas.prompt(cfg.persona))
-            append("\n\n使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。回答簡短，適合朗讀；需要條列時最多三點。")
+            append("\n\n使用者是台灣人。一律使用台灣繁體中文字和台灣用語，絕不出現任何簡體字，即使使用者的輸入是英文或簡體也一樣；")
+            append("使用者整句用英文提問時才用英文回答。回答簡短，適合朗讀；需要條列時最多三點。")
             append("\n新增行程時，只要提到地點就一定填 location（完整地址或店名），Google 日曆會據此在該出發時提醒並導航。")
             if (caps.isNotBlank()) {
                 append("\n\n## 目前使用者授權給你的能力\n").append(caps)
