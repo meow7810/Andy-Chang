@@ -116,43 +116,45 @@ class NotificationCapability(private val context: Context) : Capability {
         ToolSpec("dismiss_notification", "清除一則通知。", listOf(ToolParam("key", "string", "通知 key"))),
     )
 
-    override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? = when (call.name) {
-        "list_notifications" -> {
-            if (!listenerEnabled()) err("使用者尚未在系統設定授權 ClaudeRi 讀取通知。")
-            else {
-                val list = NotificationStore.active.value
-                if (list.isEmpty()) ok("目前沒有來自允許的 App 的通知。")
-                else ok(list.joinToString("\n") {
-                    "[${it.key}] ${fmt.format(Date(it.postedAt))} ${it.appLabel}｜${it.title}：${it.text}" +
-                        if (it.canReply) "（可回覆）" else ""
-                })
+    override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? {
+        return when (call.name) {
+            "list_notifications" -> {
+                if (!listenerEnabled()) err("使用者尚未在系統設定授權 ClaudeRi 讀取通知。")
+                else {
+                    val list = NotificationStore.active.value
+                    if (list.isEmpty()) ok("目前沒有來自允許的 App 的通知。")
+                    else ok(list.joinToString("\n") {
+                        "[${it.key}] ${fmt.format(Date(it.postedAt))} ${it.appLabel}｜${it.title}：${it.text}" +
+                            if (it.canReply) "（可回覆）" else ""
+                    })
+                }
             }
-        }
-        "reply_notification" -> {
-            val key = call.str("key") ?: return err("缺少 key")
-            val text = call.str("text") ?: return err("缺少 text")
-            val sbn = synchronized(NotificationStore.raw) { NotificationStore.raw[key] } ?: return err("找不到這則通知（可能已被清除）")
-            if (!NotificationStore.isAllowed(sbn.packageName)) return err("這個 App 不在允許清單中")
-            val action = ClaudeRiNotificationListener.replyAction(sbn.notification) ?: return err("這則通知不支援快速回覆")
-            val remoteInputs = action.remoteInputs
-            val intent = Intent()
-            val results = Bundle()
-            remoteInputs.forEach { results.putCharSequence(it.resultKey, text) }
-            RemoteInput.addResultsToIntent(remoteInputs, intent, results)
-            try {
-                action.actionIntent.send(context, 0, intent)
-                ok("已透過 ${sbn.packageName} 回覆：$text")
-            } catch (e: PendingIntent.CanceledException) {
-                err("回覆失敗：通知的回覆動作已失效")
+            "reply_notification" -> {
+                val key = call.str("key") ?: return err("缺少 key")
+                val text = call.str("text") ?: return err("缺少 text")
+                val sbn = synchronized(NotificationStore.raw) { NotificationStore.raw[key] } ?: return err("找不到這則通知（可能已被清除）")
+                if (!NotificationStore.isAllowed(sbn.packageName)) return err("這個 App 不在允許清單中")
+                val action = ClaudeRiNotificationListener.replyAction(sbn.notification) ?: return err("這則通知不支援快速回覆")
+                val remoteInputs = action.remoteInputs
+                val intent = Intent()
+                val results = Bundle()
+                remoteInputs.forEach { results.putCharSequence(it.resultKey, text) }
+                RemoteInput.addResultsToIntent(remoteInputs, intent, results)
+                try {
+                    action.actionIntent.send(context, 0, intent)
+                    ok("已透過 ${sbn.packageName} 回覆：$text")
+                } catch (e: PendingIntent.CanceledException) {
+                    err("回覆失敗：通知的回覆動作已失效")
+                }
             }
+            "dismiss_notification" -> {
+                val key = call.str("key") ?: return err("缺少 key")
+                val svc = NotificationStore.listener ?: return err("通知監聽服務未連線")
+                svc.cancelNotification(key)
+                ok("已清除通知 $key")
+            }
+            else -> null
         }
-        "dismiss_notification" -> {
-            val key = call.str("key") ?: return err("缺少 key")
-            val svc = NotificationStore.listener ?: return err("通知監聽服務未連線")
-            svc.cancelNotification(key)
-            ok("已清除通知 $key")
-        }
-        else -> null
     }
 
     fun listenerEnabled(): Boolean =

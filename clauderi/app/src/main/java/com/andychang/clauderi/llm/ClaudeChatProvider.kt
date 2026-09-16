@@ -80,7 +80,7 @@ class ClaudeChatProvider(
             if (stop != StopReason.TOOL_USE) return@withContext ChatReply(text, used)
 
             val results = response.content().mapNotNull { it.toolUse().orElse(null) }.map { use ->
-                used += use.name
+                used += use.name()
                 val args = runCatching {
                     @Suppress("UNCHECKED_CAST")
                     JSONObject(use._input().convert(Map::class.java) as Map<String, Any?>)

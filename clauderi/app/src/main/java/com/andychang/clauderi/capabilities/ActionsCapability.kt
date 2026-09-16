@@ -45,40 +45,42 @@ class ActionsCapability(private val context: Context) : Capability {
         ToolSpec("play_music", "用預設音樂 App 搜尋並播放。", listOf(ToolParam("query", "string", "歌名、歌手或播放清單"))),
     )
 
-    override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? = when (call.name) {
-        "send_message" -> {
-            val to = call.str("to")?.trim().orEmpty()
-            val body = call.str("body").orEmpty()
-            if (to.isEmpty()) err("缺少收件人")
-            else {
-                val number = resolveNumber(to, settings) ?: return err("找不到「$to」的電話；請提供號碼")
-                launch(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$number")).putExtra("sms_body", body))
-                    ?.let { err(it) } ?: ok("已開啟簡訊 App，收件人 $number，內容已填好，等使用者按送出。")
+    override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? {
+        return when (call.name) {
+            "send_message" -> {
+                val to = call.str("to")?.trim().orEmpty()
+                val body = call.str("body").orEmpty()
+                if (to.isEmpty()) err("缺少收件人")
+                else {
+                    val number = resolveNumber(to, settings) ?: return err("找不到「$to」的電話；請提供號碼")
+                    launch(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$number")).putExtra("sms_body", body))
+                        ?.let { err(it) } ?: ok("已開啟簡訊 App，收件人 $number，內容已填好，等使用者按送出。")
+                }
             }
+            "set_alarm" -> {
+                val h = call.int("hour") ?: return err("缺少 hour")
+                val m = call.int("minute") ?: 0
+                val i = Intent(AlarmClock.ACTION_SET_ALARM)
+                    .putExtra(AlarmClock.EXTRA_HOUR, h).putExtra(AlarmClock.EXTRA_MINUTES, m)
+                    .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                call.str("label")?.let { i.putExtra(AlarmClock.EXTRA_MESSAGE, it) }
+                launch(i)?.let { err(it) } ?: ok("已設定 %02d:%02d 的鬧鐘。".format(h, m))
+            }
+            "set_timer" -> {
+                val s = call.int("seconds") ?: return err("缺少 seconds")
+                val i = Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, s).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                call.str("label")?.let { i.putExtra(AlarmClock.EXTRA_MESSAGE, it) }
+                launch(i)?.let { err(it) } ?: ok("已設定 $s 秒的計時器。")
+            }
+            "play_music" -> {
+                val q = call.str("query").orEmpty()
+                val i = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
+                    .putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+                    .putExtra(android.app.SearchManager.QUERY, q)
+                launch(i)?.let { err(it) } ?: ok("已請音樂 App 播放「$q」。")
+            }
+            else -> null
         }
-        "set_alarm" -> {
-            val h = call.int("hour") ?: return err("缺少 hour")
-            val m = call.int("minute") ?: 0
-            val i = Intent(AlarmClock.ACTION_SET_ALARM)
-                .putExtra(AlarmClock.EXTRA_HOUR, h).putExtra(AlarmClock.EXTRA_MINUTES, m)
-                .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
-            call.str("label")?.let { i.putExtra(AlarmClock.EXTRA_MESSAGE, it) }
-            launch(i)?.let { err(it) } ?: ok("已設定 %02d:%02d 的鬧鐘。".format(h, m))
-        }
-        "set_timer" -> {
-            val s = call.int("seconds") ?: return err("缺少 seconds")
-            val i = Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, s).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
-            call.str("label")?.let { i.putExtra(AlarmClock.EXTRA_MESSAGE, it) }
-            launch(i)?.let { err(it) } ?: ok("已設定 $s 秒的計時器。")
-        }
-        "play_music" -> {
-            val q = call.str("query").orEmpty()
-            val i = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
-                .putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
-                .putExtra(android.app.SearchManager.QUERY, q)
-            launch(i)?.let { err(it) } ?: ok("已請音樂 App 播放「$q」。")
-        }
-        else -> null
     }
 
     private suspend fun resolveNumber(to: String, settings: AppSettings): String? {
