@@ -34,10 +34,20 @@ data class ToolCall(val id: String, val name: String, val args: JSONObject) {
     fun bool(key: String): Boolean? = str(key)?.toBooleanStrictOrNull()
 }
 
-data class ToolResult(val text: String, val isError: Boolean = false)
+/** [imageJpeg] lets a tool hand the model a picture (Claude: image block inside the tool_result). */
+data class ToolResult(val text: String, val isError: Boolean = false, val imageJpeg: ByteArray? = null)
 
 fun interface ToolExecutor {
     suspend fun execute(call: ToolCall): ToolResult
+}
+
+/**
+ * System prompt in two parts so providers can cache the stable one.
+ * [stable]: persona + capability descriptions (changes only when settings change).
+ * [volatile]: memory, current time, anything that changes turn to turn.
+ */
+data class SystemPrompt(val stable: String, val volatile: String) {
+    val full: String get() = if (volatile.isBlank()) stable else stable + "\n\n" + volatile
 }
 
 data class ChatReply(val text: String, val toolsUsed: List<String>)
@@ -54,7 +64,7 @@ interface ChatProvider {
      * capability the user grants mid-turn (via request_capability) is available on the next round.
      */
     suspend fun reply(
-        systemPrompt: suspend () -> String,
+        systemPrompt: suspend () -> SystemPrompt,
         history: List<ChatTurn>,
         tools: suspend () -> List<ToolSpec>,
         executor: ToolExecutor,

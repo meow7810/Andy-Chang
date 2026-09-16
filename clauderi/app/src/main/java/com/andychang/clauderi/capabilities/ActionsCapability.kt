@@ -24,7 +24,8 @@ class ActionsCapability(private val context: Context) : Capability {
 
     override fun promptSection(settings: AppSettings) =
         "你可以執行動作：send_message（開啟簡訊 App 並填好收件人與內容，由使用者按送出）、" +
-            "set_alarm、set_timer、play_music。動作會直接執行，執行前如果資訊不完整先問清楚。"
+            "set_alarm、set_timer、play_music、navigate_to（開啟 Google Maps 開始導航；「剛才那個地址」就用對話裡提過的地點）。" +
+            "動作會直接執行，執行前如果資訊不完整先問清楚。"
 
     override fun tools(settings: AppSettings) = listOf(
         ToolSpec(
@@ -43,6 +44,13 @@ class ActionsCapability(private val context: Context) : Capability {
             listOf(ToolParam("seconds", "integer", "總秒數"), ToolParam("label", "string", "標籤", required = false)),
         ),
         ToolSpec("play_music", "用預設音樂 App 搜尋並播放。", listOf(ToolParam("query", "string", "歌名、歌手或播放清單"))),
+        ToolSpec(
+            "navigate_to", "開啟地圖 App 並開始導航到指定地點。",
+            listOf(
+                ToolParam("destination", "string", "地址、店名或地標"),
+                ToolParam("mode", "string", "交通方式", required = false, enum = listOf("driving", "walking", "transit", "bicycling")),
+            ),
+        ),
     )
 
     override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? {
@@ -71,6 +79,18 @@ class ActionsCapability(private val context: Context) : Capability {
                 val i = Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, s).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
                 call.str("label")?.let { i.putExtra(AlarmClock.EXTRA_MESSAGE, it) }
                 launch(i)?.let { err(it) } ?: ok("已設定 $s 秒的計時器。")
+            }
+            "navigate_to" -> {
+                val dest = call.str("destination")?.trim().orEmpty()
+                if (dest.isEmpty()) err("缺少 destination")
+                else {
+                    val modeFlag = when (call.str("mode")) { "walking" -> "w"; "transit" -> "r"; "bicycling" -> "b"; else -> "d" }
+                    val nav = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=${Uri.encode(dest)}&mode=$modeFlag"))
+                        .setPackage("com.google.android.apps.maps")
+                    // Fall back to any maps app if Google Maps is not installed.
+                    (launch(nav)?.let { launch(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(dest)}"))) })
+                        ?.let { err(it) } ?: ok("已開始導航到 $dest。")
+                }
             }
             "play_music" -> {
                 val q = call.str("query").orEmpty()

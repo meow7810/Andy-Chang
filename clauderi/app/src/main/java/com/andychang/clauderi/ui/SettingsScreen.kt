@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.SttBackend
 import kotlinx.coroutines.launch
 
@@ -130,12 +131,64 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             label = { Text("每次送給模型的歷史則數") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("長期記憶")
+                Text("超出上面則數的舊對話會在背景壓縮成「關於你的事」，永久保留；也可對它說「記住…」", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.longTermMemory, onCheckedChange = { draft = draft.copy(longTermMemory = it) })
+        }
+        if (draft.longTermMemory) {
+            if (draft.llm == LlmBackend.CLAUDE) {
+                Plain(draft.memoryModel, "整理記憶用的模型（預設 claude-haiku-4-5，便宜五倍）") { draft = draft.copy(memoryModel = it) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("整理記憶走 Batch API")
+                        Text("半價；結果幾分鐘到最多 24 小時後、下次對話時套用", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Switch(checked = draft.memoryUseBatch, onCheckedChange = { draft = draft.copy(memoryUseBatch = it) })
+                }
+            }
+            val memoryText by app.memory.text.collectAsState()
+            var editing by remember { mutableStateOf(false) }
+            var memoryDraft by remember(memoryText) { mutableStateOf(memoryText) }
+            if (editing) {
+                OutlinedTextField(memoryDraft, { memoryDraft = it }, label = { Text("長期記憶（可直接編輯）") }, modifier = Modifier.fillMaxWidth(), minLines = 6)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { scope.launch { app.memory.replace(memoryDraft); editing = false } }) { Text("儲存記憶") }
+                    OutlinedButton(onClick = { editing = false }) { Text("取消") }
+                }
+            } else {
+                Text(
+                    memoryText.ifBlank { "（目前是空的）" },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { editing = true }) { Text("編輯記憶") }
+                    OutlinedButton(onClick = { scope.launch { app.memory.clear() } }) { Text("清除長期記憶") }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("語音提問的回覆用語音朗讀")
             Switch(checked = draft.speakVoiceReplies, onCheckedChange = { draft = draft.copy(speakVoiceReplies = it) })
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("打字提問的回覆也朗讀")
             Switch(checked = draft.speakTextReplies, onCheckedChange = { draft = draft.copy(speakTextReplies = it) })
+        }
+        Text("氣場", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Persona.entries.forEach { p ->
+                FilterChip(selected = draft.persona == p, onClick = { draft = draft.copy(persona = p) }, label = { Text(p.label) })
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("長按 Home 召喚時先說「何事需要驚動本王？」")
+                Text("只在克勞德大人模式有效；會多花約一秒再開始聆聽", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.wakeGreeting, onCheckedChange = { draft = draft.copy(wakeGreeting = it) })
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {

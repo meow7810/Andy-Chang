@@ -1,14 +1,8 @@
 package com.andychang.clauderi.ui
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.provider.Settings as SysSettings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,18 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,19 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.assistant.AssistantState
-import com.andychang.clauderi.capabilities.CalendarCapability
-import com.andychang.clauderi.capabilities.ContactsCapability
-import com.andychang.clauderi.capabilities.GmailCapability
-import com.andychang.clauderi.capabilities.NotificationCapability
-import com.andychang.clauderi.capabilities.RequestOutcome
-import com.andychang.clauderi.capabilities.ScreenCapability
-import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.AppSettings
-import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.Source
-import com.andychang.clauderi.llm.Role
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private const val AUTO_SEND_DELAY_MS = 2_000L
 
@@ -114,7 +92,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("ClaudeRi", style = MaterialTheme.typography.titleMedium)
+            Text("Lord Claude !", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
             Text(stateLabel(state), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
@@ -128,8 +106,6 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(12.dp)) {
             items(messages, key = { it.id }) { Bubble(it) }
         }
-
-        CapabilityRequestCard(app)
 
         if (armed) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -167,72 +143,6 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * The in-chat permission prompt. The model asked for a capability via request_capability and is
- * now blocked waiting; the user decides here. 允許 flips the app switch and, where Android needs
- * it, runs the system permission dialog (calendar / contacts) or opens the system settings page
- * (notification access / accessibility) before answering the model.
- */
-@Composable
-private fun CapabilityRequestCard(app: ClaudeRiApp) {
-    val request by app.capabilities.broker.pending.collectAsState()
-    val req = request ?: return
-    val scope = rememberCoroutineScope()
-    val broker = app.capabilities.broker
-    val cfg by app.settings.flow.collectAsState(initial = AppSettings())
-
-    fun finish(systemOk: Boolean) = broker.resolve(if (systemOk) RequestOutcome.GRANTED else RequestOutcome.GRANTED_SYSTEM_PENDING)
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        finish(result.values.all { it })
-    }
-    val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val cap = broker.pending.value?.capability ?: return@rememberLauncherForActivityResult
-        finish(systemReady(app, cap, cfg))
-    }
-
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("ClaudeRi 想開啟「${req.capability.title}」", style = MaterialTheme.typography.titleSmall)
-            Text(req.reason, style = MaterialTheme.typography.bodyMedium)
-            Text(req.capability.summary, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { broker.resolve(RequestOutcome.DENIED) }) { Text("拒絕") }
-                Button(onClick = {
-                    scope.launch {
-                        app.settings.setCapability(req.capability, true)
-                        when (req.capability) {
-                            CapabilityId.ACTIONS -> finish(true)
-                            CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
-                            CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
-                            CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
-                            CapabilityId.NOTIFICATIONS ->
-                                if (systemReady(app, req.capability, cfg)) finish(true)
-                                else settingsLauncher.launch(Intent(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                            CapabilityId.SCREEN ->
-                                if (systemReady(app, req.capability, cfg)) finish(true)
-                                else settingsLauncher.launch(Intent(SysSettings.ACTION_ACCESSIBILITY_SETTINGS))
-                        }
-                    }
-                }) { Text("允許") }
-            }
-        }
-    }
-}
-
-/** Whether the Android-side permission behind a capability is already in place. */
-private fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings): Boolean = when (cap) {
-    CapabilityId.NOTIFICATIONS -> (app.capabilities.byId(cap) as NotificationCapability).listenerEnabled()
-    CapabilityId.SCREEN -> (app.capabilities.byId(cap) as ScreenCapability).serviceEnabled()
-    CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).let { it.granted() && it.writeGranted() }
-    CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
-    CapabilityId.ACTIONS -> true
-    CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
-}
-
 private fun stateLabel(s: AssistantState) = when (s) {
     AssistantState.Idle -> "待命"
     AssistantState.Listening -> "聆聽中…"
@@ -240,36 +150,4 @@ private fun stateLabel(s: AssistantState) = when (s) {
     is AssistantState.Thinking -> "思考中…"
     is AssistantState.Speaking -> "朗讀中…"
     is AssistantState.Error -> "錯誤"
-}
-
-@Composable
-private fun Bubble(m: ChatMessage) {
-    val mine = m.role == Role.USER
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-        Box(
-            Modifier
-                .widthIn(max = 300.dp)
-                .background(
-                    when {
-                        m.error -> Color(0xFF5A1F1F)
-                        mine -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                        else -> Color(0xFF2A2438)
-                    },
-                    RoundedCornerShape(14.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Column {
-                Text(m.text, style = MaterialTheme.typography.bodyMedium)
-                val meta = buildString {
-                    append(if (m.source == Source.VOICE) "🎙 語音" else "⌨ 文字")
-                    if (m.toolsUsed.isNotEmpty()) append("  🔧 ").append(m.toolsUsed.distinct().joinToString(", "))
-                }
-                Text(meta, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                m.toolErrors.forEach { e ->
-                    Text("⚠ $e", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFB74D))
-                }
-            }
-        }
-    }
 }

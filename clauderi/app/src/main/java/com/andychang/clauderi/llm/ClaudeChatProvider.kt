@@ -4,7 +4,10 @@ import com.anthropic.client.AnthropicClient
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.core.JsonValue
 import com.anthropic.errors.AnthropicServiceException
+import android.util.Base64
+import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.CacheControlEphemeral
+import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.MessageParam
@@ -38,7 +41,7 @@ class ClaudeChatProvider(
     private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
 
     override suspend fun reply(
-        systemPrompt: suspend () -> String, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
+        systemPrompt: suspend () -> SystemPrompt, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
     ): ChatReply = withContext(Dispatchers.IO) {
         val messages = history.map { turn ->
             MessageParam.builder()
@@ -54,15 +57,9 @@ class ClaudeChatProvider(
                 .model(model)
                 .maxTokens(maxTokens)
                 .thinking(ThinkingConfigAdaptive.builder().build())
-                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
-                .systemOfTextBlockParams(
-                    listOf(
-                        TextBlockParam.builder()
-                            .text(systemPrompt())
-                            .cacheControl(CacheControlEphemeral.builder().build())
-                            .build(),
-                    ),
-                )
+                // Phone-assistant turns are short; LOW keeps thinking tokens (billed as output) down.
+                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
+                .systemOfTextBlockParams(systemBlocks(systemPrompt()))
                 .messages(messages)
             sdkTools.forEach { builder.addTool(it) }
 
@@ -86,13 +83,39 @@ class ClaudeChatProvider(
                     JSONObject(use._input().convert(Map::class.java) as Map<String, Any?>)
                 }.getOrElse { JSONObject() }
                 val r = executor.execute(ToolCall(use.id(), use.name(), args))
-                ContentBlockParam.ofToolResult(
-                    ToolResultBlockParam.builder().toolUseId(use.id()).content(r.text).isError(r.isError).build(),
-                )
+                val builder = ToolResultBlockParam.builder().toolUseId(use.id()).isError(r.isError)
+                if (r.imageJpeg == null) {
+                    builder.content(r.text)
+                } else {
+                    val image = ImageBlockParam.builder().source(
+                        Base64ImageSource.builder()
+                            .mediaType(Base64ImageSource.MediaType.IMAGE_JPEG)
+                            .data(Base64.encodeToString(r.imageJpeg, Base64.NO_WRAP))
+                            .build(),
+                    ).build()
+                    builder.content(
+                        ToolResultBlockParam.Content.ofBlocks(
+                            listOf(
+                                ToolResultBlockParam.Content.Block.ofImage(image),
+                                ToolResultBlockParam.Content.Block.ofText(r.text),
+                            ),
+                        ),
+                    )
+                }
+                ContentBlockParam.ofToolResult(builder.build())
             }
             messages += MessageParam.builder().role(MessageParam.Role.USER).contentOfBlockParams(results).build()
         }
         ChatReply("（工具呼叫太多次，先停在這裡。）", used)
+    }
+
+    /** Stable text first with the cache breakpoint; volatile text (memory, clock) after it, uncached. */
+    private fun systemBlocks(sp: SystemPrompt): List<TextBlockParam> {
+        val blocks = mutableListOf(
+            TextBlockParam.builder().text(sp.stable).cacheControl(CacheControlEphemeral.builder().build()).build(),
+        )
+        if (sp.volatile.isNotBlank()) blocks += TextBlockParam.builder().text(sp.volatile).build()
+        return blocks
     }
 
     private fun toSdkTool(spec: ToolSpec): Tool {

@@ -100,7 +100,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                                 CapabilityId.NOTIFICATIONS -> if (!(cap as NotificationCapability).listenerEnabled()) open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                 CapabilityId.SCREEN -> if (!(cap as ScreenCapability).serviceEnabled()) open(SysSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                CapabilityId.ACTIONS, CapabilityId.GMAIL -> Unit
+                                CapabilityId.ACTIONS, CapabilityId.GMAIL, CapabilityId.CAMERA -> Unit
                             }
                         })
                     }
@@ -130,7 +130,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 )
                             }) { Text("再次要求權限") }
                         }
-                        CapabilityId.ACTIONS -> Unit
+                        CapabilityId.ACTIONS, CapabilityId.CAMERA -> Unit
                         CapabilityId.GMAIL -> if (on) {
                             val ready = cfg.gmailAddress.isNotBlank() && cfg.gmailAppPassword.isNotBlank()
                             Text(

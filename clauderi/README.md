@@ -1,4 +1,6 @@
-# ClaudeRi — 由你逐項授權的 Android AI 助理
+# Lord Claude ! （ClaudeRi）— 由你逐項授權的 Android AI 助理
+
+> 奴才：Hey, Lord Claude！　本王：何事需要驚動本王？
 
 對標 Siri，但每一個能碰到手機資料的「能力」都是獨立開關；沒打開的能力，模型連它存在都不知道
 （工具不會送給模型、system prompt 也不會提到）。不涉及任何眼鏡硬體。
@@ -11,6 +13,8 @@
 - 聽寫鍵盤模式：用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出（你的鍵盤訂閱，不用 API）
 - 辨識結果先填進輸入框，2 秒沒動才送出；期間可修改或按「先不要送」
 - 對話記憶：`conversation.jsonl` 存手機本地，不設上限；送給模型的則數在設定頁調
+- 長期記憶：超出視窗的舊對話在背景壓成 `memory.json`（關於使用者的穩定事實，≤2000 字），每輪放進 system prompt；`remember` 工具可直接寫入；設定頁可看、可編輯、可清除、可關閉。整理用 Haiku 4.5 並走 Batch API（半價、下次對話套用），都可改
+- 成本：system prompt 分「穩定」（人設、能力說明，掛 prompt cache）和「易變」（記憶、時間）兩塊；思考強度 low
 - 打字和語音共用同一份記憶；每個能力 = 一組 Claude 工具
 
 ## 專案結構（`clauderi/`）
@@ -20,6 +24,7 @@ app/src/main/java/com/andychang/clauderi/
   ClaudeRiApp.kt                     Application，把各層接起來
   data/Settings.kt                   API key、模型、記憶深度、能力開關、通知 App 允許清單（DataStore）
   data/ConversationStore.kt          對話記憶（JSON lines，永久保存）
+  data/MemoryStore.kt                長期記憶：背景壓縮舊對話 + remember 工具
   llm/ChatProvider.kt                ToolSpec / ToolCall / ChatProvider 介面
   llm/ClaudeChatProvider.kt          Claude + 手動 tool-use 迴圈（adaptive thinking、prompt cache）
   llm/OpenAiChatProvider.kt          OpenAI 相容端點 + function calling 迴圈
@@ -35,6 +40,7 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / play_music（Intent）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
   capabilities/GmailCapability.kt         IMAP（X-GM-RAW 搜尋）search_email / read_email
+  capabilities/CameraCapability.kt        take_photo（照片進 tool_result）/ share_last_photo（分享面板）
   capabilities/PermissionBroker.kt        對話中請求能力：模型呼叫 request_capability，卡片等使用者按允許
   assistant/AssistantEngine.kt       流程：錄音 → STT → 輸入框確認 → LLM(+工具) → 存檔 → TTS
   assistant/ClaudeRiVoiceInteractionService.kt  註冊為預設數位助理（長按 Home）；ProxyRecognitionService 把系統辨識轉給真正的引擎
@@ -52,8 +58,9 @@ app/src/main/java/com/andychang/clauderi/
 1. **預設助理**：`VoiceInteractionService` + `ACTION_ASSIST`。到「能力」頁按「前往系統設定」選 ClaudeRi。
 2. **通知朗讀與回覆**：開啟後到系統「通知存取權」授權，再逐 App 勾選允許哪些。工具：`list_notifications`、`reply_notification`（用通知本身的快速回覆）、`dismiss_notification`。
 3. **行事曆、聯絡人**：各自獨立開關，開啟時才要 `READ_CALENDAR` + `WRITE_CALENDAR` / `READ_CONTACTS`。行事曆可讀可新增（`add_calendar_event`）。
-4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂，全走系統 Intent。
+4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂、導航（Google Maps），全走系統 Intent。
 5. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
+7. **相機與照片**：`take_photo` 開系統相機，照片縮到 1280px 後直接夾在工具結果裡給模型看（Claude 原生支援；OpenAI 相容端點改以下一則 user 訊息附圖）。`share_last_photo` 走系統分享面板，你選 App 和收件人。不需要相機權限，照片只在 App 快取。
 6. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`。資料夾以 READ_ONLY 開啟，讀信不會標成已讀。
 
 ## 在 Android Studio 建置

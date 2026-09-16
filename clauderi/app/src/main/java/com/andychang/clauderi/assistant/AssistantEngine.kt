@@ -11,13 +11,20 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.MemoryStore
+import com.andychang.clauderi.data.Persona
+import com.andychang.clauderi.data.Personas
 import com.andychang.clauderi.data.Settings
 import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.data.SttBackend
 import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ClaudeChatProvider
+import com.andychang.clauderi.llm.ClaudeMemorySummarizer
+import com.andychang.clauderi.llm.DirectSummarizer
+import com.andychang.clauderi.llm.MemorySummarizer
 import com.andychang.clauderi.llm.OpenAiChatProvider
 import com.andychang.clauderi.llm.Role
+import com.andychang.clauderi.llm.SystemPrompt
 import com.andychang.clauderi.llm.ToolExecutor
 import com.andychang.clauderi.stt.AndroidSpeechToText
 import com.andychang.clauderi.stt.OpenAiSpeechToText
@@ -60,6 +67,7 @@ class AssistantEngine(
     context: Context,
     private val settings: Settings,
     private val store: ConversationStore,
+    private val memory: MemoryStore,
     private val capabilities: CapabilityRegistry,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -98,9 +106,20 @@ class AssistantEngine(
         }
     }
 
-    fun startVoiceTurn() {
+    /** [greet] = summoned via long-press Home: speak the wake line first, then listen. */
+    fun startVoiceTurn(greet: Boolean = false) {
         if (voiceJob?.isActive == true) return
-        voiceJob = scope.launch { runVoiceCapture() }
+        voiceJob = scope.launch {
+            if (greet) {
+                val cfg = settings.current()
+                if (cfg.wakeGreeting && cfg.persona == Persona.LORD) {
+                    speaker.stop()
+                    _state.value = AssistantState.Speaking(Personas.WAKE_LINE)
+                    speaker.speak(Personas.WAKE_LINE)
+                }
+            }
+            runVoiceCapture()
+        }
     }
 
     fun cancelVoiceTurn() {
@@ -155,6 +174,7 @@ class AssistantEngine(
             )
             return@withLock
         }
+        speaker.stop()   // a new question interrupts whatever is still being read aloud
         store.append(Role.USER, userText, source)
         _state.value = AssistantState.Thinking(userText)
 
@@ -176,21 +196,23 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
+        val replyText = reply.text.ifBlank { "（本座無話可說。）" }
+        store.append(Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
+        if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
         if (speakReply && reply.text.isNotBlank()) {
-            _state.value = AssistantState.Speaking(reply.text)
-            speaker.speak(reply.text)
+            _state.value = AssistantState.Speaking(replyText)
+            speaker.speak(replyText)
         }
         _state.value = AssistantState.Idle
     }
 
-    private fun buildSystemPrompt(cfg: AppSettings): String {
-        val now = SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())
+    private fun buildSystemPrompt(cfg: AppSettings): SystemPrompt {
         val caps = capabilities.promptSections(cfg)
-        return buildString {
-            append("你是 ClaudeRi，一個在使用者手機上運行的個人助理，使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。")
-            append("回答簡短口語，適合朗讀；需要條列時最多三點。")
+        val stable = buildString {
+            append(Personas.prompt(cfg.persona))
+            append("\n\n使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。回答簡短，適合朗讀；需要條列時最多三點。")
+            append("\n新增行程時，只要提到地點就一定填 location（完整地址或店名），Google 日曆會據此在該出發時提醒並導航。")
             if (caps.isNotBlank()) {
                 append("\n\n## 目前使用者授權給你的能力\n").append(caps)
                 append("\n\n沒列在上面的能力你都沒有，被問到就直說做不到，不要假裝。")
@@ -198,9 +220,26 @@ class AssistantEngine(
                 append("\n\n使用者目前沒有授權任何手機能力給你，你只能純聊天；被要求操作手機時直說目前沒有授權。")
             }
             if (cfg.customInstructions.isNotBlank()) append("\n\n## 使用者的額外指示\n").append(cfg.customInstructions)
-            append("\n\n（現在時間：").append(now).append("）")
         }
+        val volatile = buildString {
+            if (cfg.longTermMemory) {
+                val mem = memory.text.value
+                append("## 長期記憶（關於使用者，跨對話保留）\n")
+                append(mem.ifBlank { "（還沒有。使用者說「記住」或透露長期有用的事時，用 remember 工具寫入。）" })
+                append("\n\n")
+            }
+            append("（現在時間：").append(SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())).append("）")
+        }
+        return SystemPrompt(stable, volatile)
     }
+
+    /** Claude backend: cheap model + Batch. Anything else: the chat provider itself, synchronously. */
+    private fun buildSummarizer(cfg: AppSettings, llm: ChatProvider): MemorySummarizer =
+        if (cfg.llm == LlmBackend.CLAUDE && cfg.anthropicKey.isNotBlank()) {
+            ClaudeMemorySummarizer(cfg.anthropicKey, cfg.memoryModel.ifBlank { ClaudeMemorySummarizer.DEFAULT_MODEL }, cfg.memoryUseBatch)
+        } else {
+            DirectSummarizer(llm)
+        }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel) }
