@@ -1,6 +1,9 @@
 package com.andychang.clauderi.capabilities
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.llm.ToolCall
@@ -45,7 +48,9 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
     override fun promptSection(settings: AppSettings) =
         "你可以用 search_email 搜尋使用者的 Gmail（Gmail 搜尋語法：from:、subject:、newer_than:7d、is:unread、has:attachment；" +
             "盡量用英文語法組合條件，只有真的需要中文關鍵字時才放中文，中文查詢只會比對主旨、寄件者和內文），" +
-            "用 read_email 讀完整內文。搜尋只回摘要；內文要使用者明確要求才讀。唯讀，不能寄信或刪信。"
+            "用 read_email 讀完整內文。搜尋只回摘要；內文要使用者明確要求才讀。" +
+            "整理用 archive_emails（從收件匣封存，可逆，信仍在「所有郵件」）和 unsubscribe（開該信的退訂連結給使用者按）。" +
+            "封存前一定先用 search_email 讓使用者看到會動到哪些信、講出數量，得到明確同意再執行。不能刪信、不能寄信。"
 
     override fun tools(settings: AppSettings) = listOf(
         ToolSpec(
@@ -56,20 +61,30 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
             ),
         ),
         ToolSpec("read_email", "讀取一封信的完整純文字內文（最多 4000 字）。", listOf(ToolParam("id", "string", "search_email 回傳的 id"))),
+        ToolSpec(
+            "archive_emails", "把符合 Gmail 搜尋語法的信從收件匣封存（移出 INBOX，仍可在「所有郵件」找到，可逆）。一次最多 2000 封。執行前必須先讓使用者確認。",
+            listOf(ToolParam("query", "string", "Gmail 搜尋語法，例如 from:notifications@github.com older_than:30d")),
+        ),
+        ToolSpec(
+            "unsubscribe", "讀取一封信的 List-Unsubscribe 標頭，開啟退訂網頁或退訂郵件讓使用者按下確認。",
+            listOf(ToolParam("id", "string", "search_email 回傳的 id")),
+        ),
     )
 
     fun configured(settings: AppSettings) = settings.gmailAddress.isNotBlank() && settings.gmailAppPassword.isNotBlank()
 
     override suspend fun execute(call: ToolCall, settings: AppSettings): ToolResult? {
-        if (call.name != "search_email" && call.name != "read_email") return null
+        if (call.name !in setOf("search_email", "read_email", "archive_emails", "unsubscribe")) return null
         if (!configured(settings)) return err("使用者尚未在設定頁填 Gmail 帳號與應用程式密碼。")
         return withContext(Dispatchers.IO) {
             try {
                 withStore(settings) { store ->
+                    if (call.name == "archive_emails") return@withStore archive(store, call.str("query").orEmpty())
                     val folder = allMailFolder(store).also { it.open(Folder.READ_ONLY) }
                     try {
                         when (call.name) {
                             "search_email" -> search(folder, call.str("query").orEmpty(), (call.int("max") ?: 8).coerceIn(1, 20))
+                            "unsubscribe" -> unsubscribe(folder, call.str("id")?.toLongOrNull() ?: return@withStore err("id 不正確"))
                             else -> read(folder, call.str("id")?.toLongOrNull() ?: return@withStore err("id 不正確"))
                         }
                     } finally {
@@ -160,6 +175,49 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         return ok("寄件者：$from\n主旨：${decode(m.subject)}\n時間：${m.sentDate?.let { fmt.format(it) } ?: ""}\n\n$body")
     }
 
+    /**
+     * Archive = remove from INBOX. In Gmail's IMAP, deleting + expunging inside INBOX only drops the
+     * Inbox label (the message stays in All Mail), so this is the reversible "archive", not a delete.
+     */
+    private fun archive(store: IMAPStore, query: String): ToolResult {
+        if (query.isBlank()) return err("缺少 query")
+        val inbox = store.getFolder("INBOX") as IMAPFolder
+        inbox.open(Folder.READ_WRITE)
+        try {
+            val uids = if (query.all { it.code < 128 }) gmailRawSearch(inbox, query) else standardSearch(inbox, query)
+            if (uids.isEmpty()) return ok("收件匣裡沒有符合「$query」的信。")
+            val batch = uids.take(2000)
+            var done = 0
+            batch.chunked(200).forEach { chunk ->
+                val msgs = inbox.getMessagesByUID(chunk.toLongArray()).filterNotNull().toTypedArray()
+                inbox.setFlags(msgs, Flags(Flags.Flag.DELETED), true)
+                done += msgs.size
+            }
+            inbox.expunge()
+            val rest = uids.size - batch.size
+            return ok("已封存 $done 封。" + if (rest > 0) "還有 $rest 封符合條件，再叫一次可以繼續。" else "")
+        } finally {
+            runCatching { inbox.close(true) }
+        }
+    }
+
+    /** RFC 2369 List-Unsubscribe: prefer an https link (opens the browser), else a mailto (opens the mail app). */
+    private fun unsubscribe(folder: IMAPFolder, uid: Long): ToolResult {
+        val m = folder.getMessageByUID(uid) ?: return err("找不到 id $uid 的信")
+        val header = m.getHeader("List-Unsubscribe")?.joinToString(",").orEmpty()
+        if (header.isBlank()) return err("這封信沒有 List-Unsubscribe 標頭，只能在信內文找退訂連結，用 read_email 讀內文找 unsubscribe 字樣。")
+        val targets = Regex("<([^>]+)>").findAll(header).map { it.groupValues[1].trim() }.toList()
+        val https = targets.firstOrNull { it.startsWith("http", ignoreCase = true) }
+        val mailto = targets.firstOrNull { it.startsWith("mailto:", ignoreCase = true) }
+        val target = https ?: mailto ?: return err("List-Unsubscribe 格式無法解析：$header")
+        return try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            ok(if (https != null) "已開啟退訂網頁，請使用者在頁面上按確認。" else "已開啟郵件 App 準備退訂信，請使用者按送出。")
+        } catch (e: ActivityNotFoundException) {
+            err("手機上沒有能開啟這個連結的 App：$target")
+        }
+    }
+
     private fun decode(s: String?): String = runCatching { MimeUtility.decodeText(s ?: "") }.getOrDefault(s ?: "")
 
     /** Prefer text/plain; fall back to stripped text/html. */
@@ -196,5 +254,5 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
         .replace(Regex("\\n{3,}"), "\n\n")
 
-    override fun status() = "帳號與應用程式密碼在「設定」頁填寫；唯讀，可隨時在 Google 帳號頁撤銷"
+    override fun status() = "帳號與應用程式密碼在「設定」頁填寫；可讀、可封存（可逆）、可開退訂連結；不能刪信或寄信"
 }

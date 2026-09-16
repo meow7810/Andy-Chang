@@ -61,7 +61,7 @@ app/src/main/java/com/andychang/clauderi/
 4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂、導航（Google Maps），全走系統 Intent。
 5. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
 7. **相機與照片**：`take_photo` 開系統相機，照片縮到 1280px 後直接夾在工具結果裡給模型看（Claude 原生支援；OpenAI 相容端點改以下一則 user 訊息附圖）。`share_last_photo` 走系統分享面板，你選 App 和收件人。不需要相機權限，照片只在 App 快取。
-6. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`。資料夾以 READ_ONLY 開啟，讀信不會標成已讀。
+6. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`、`archive_emails`（從收件匣封存，可逆，執行前模型必須先讓你確認）、`unsubscribe`（開該信的 List-Unsubscribe 連結）。讀信不會標成已讀；不能刪信、不能寄信。
 
 ## 在 Android Studio 建置
 
