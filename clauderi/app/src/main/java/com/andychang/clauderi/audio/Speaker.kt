@@ -24,14 +24,29 @@ class Speaker(context: Context) {
     @Volatile var pitch: Float = 1.0f
     @Volatile var rate: Float = 1.0f
 
-    /** Installed voices for Chinese / English, name -> locale label. Empty until the engine is ready. */
-    fun voices(): List<Pair<String, String>> = runCatching {
+    data class VoiceInfo(val name: String, val label: String, val language: String)
+
+    /** Installed offline voices for Chinese / English. Empty until the engine is ready. */
+    fun voices(): List<VoiceInfo> = runCatching {
         tts.voices.orEmpty()
             .filter { v -> v.locale.language == "zh" || v.locale.language == "en" }
             .filter { v -> !v.isNetworkConnectionRequired }
             .sortedWith(compareBy({ it.locale.language != "zh" }, { it.locale.toString() }, { it.name }))
-            .map { it.name to it.locale.displayName }
+            .map { VoiceInfo(it.name, it.locale.displayName, it.locale.language) }
     }.getOrDefault(emptyList())
+
+    /** Preview a specific voice with given pitch/rate without changing the saved settings. */
+    suspend fun preview(voice: String, pitchValue: Float, rateValue: Float, text: String) {
+        val savedVoice = voiceName; val savedPitch = pitch; val savedRate = rate
+        voiceName = voice; pitch = pitchValue; rate = rateValue
+        try { speak(text) } finally { voiceName = savedVoice; pitch = savedPitch; rate = savedRate }
+    }
+
+    companion object {
+        const val DEMO_ZH = "嘿，克勞德大人！何事需要驚動本王？"
+        const val DEMO_EN = "Hey, Lord Claude! What dares to disturb me?"
+        private const val TAG = "Speaker"
+    }
 
     suspend fun speak(text: String, locale: Locale = Locale.TRADITIONAL_CHINESE) {
         if (!ready.await()) { Log.w(TAG, "TTS engine unavailable"); return }
@@ -71,6 +86,4 @@ class Speaker(context: Context) {
             .replace(Regex("\\[(.*?)]\\((.*?)\\)"), "$1")
             .replace(Regex("\\n{2,}"), "\n")
             .trim()
-
-    companion object { private const val TAG = "Speaker" }
 }

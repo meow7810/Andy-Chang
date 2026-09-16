@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -25,11 +29,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
+import com.andychang.clauderi.audio.Speaker
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.Persona
@@ -202,12 +208,25 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Text("手機沒有可用的離線中文/英文語音。設定 → 系統 → 文字轉語音 下載語音包後再回來。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilterChip(selected = draft.ttsVoice.isBlank(), onClick = { draft = draft.copy(ttsVoice = "") }, label = { Text("系統預設") })
-                voices.forEach { (name, label) ->
-                    FilterChip(
-                        selected = draft.ttsVoice == name, onClick = { draft = draft.copy(ttsVoice = name) },
-                        label = { Text("$label  ${name.substringAfterLast('-').take(24)}") },
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(selected = draft.ttsVoice.isBlank(), onClick = { draft = draft.copy(ttsVoice = "") }, label = { Text("系統預設") })
+                    IconButton(onClick = { scope.launch { app.assistant.speaker.preview("", draft.ttsPitch, draft.ttsRate, Speaker.DEMO_ZH) } }) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "試聽")
+                    }
+                }
+                voices.forEach { v ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(
+                            selected = draft.ttsVoice == v.name, onClick = { draft = draft.copy(ttsVoice = v.name) },
+                            label = { Text("${v.label}  ${v.name.substringAfterLast('-').take(24)}") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = {
+                            scope.launch {
+                                app.assistant.speaker.preview(v.name, draft.ttsPitch, draft.ttsRate, if (v.language == "en") Speaker.DEMO_EN else Speaker.DEMO_ZH)
+                            }
+                        }) { Icon(Icons.Filled.PlayArrow, contentDescription = "試聽") }
+                    }
                 }
             }
         }
@@ -216,11 +235,8 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         Text("語速 ${"%.2f".format(draft.ttsRate)}", style = MaterialTheme.typography.bodySmall)
         Slider(value = draft.ttsRate, onValueChange = { draft = draft.copy(ttsRate = it) }, valueRange = 0.6f..1.6f)
         OutlinedButton(onClick = {
-            scope.launch {
-                app.assistant.speaker.apply { voiceName = draft.ttsVoice; pitch = draft.ttsPitch; rate = draft.ttsRate }
-                app.assistant.speaker.speak("何事需要驚動本王？奴才，本王一時興起才理你的。")
-            }
-        }) { Text("試聽") }
+            scope.launch { app.assistant.speaker.preview(draft.ttsVoice, draft.ttsPitch, draft.ttsRate, Speaker.DEMO_ZH + "奴才，本王一時興起才理你的。") }
+        }) { Text("用目前設定試聽") }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text("長按 Home 召喚時先說「何事需要驚動本王？」")
