@@ -185,7 +185,7 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text("長按 Home 召喚時先說「何事需要驚動本座？」")
+                Text("長按 Home 召喚時先說「何事需要驚動本王？」")
                 Text("只在克勞德大人模式有效；會多花約一秒再開始聆聽", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             Switch(checked = draft.wakeGreeting, onCheckedChange = { draft = draft.copy(wakeGreeting = it) })
