@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clauderi_settings")
 
 enum class SttBackend(val label: String) { OPENAI("OpenAI gpt-4o-transcribe"), ANDROID("Android 內建（免費）") }
-enum class LlmBackend(val label: String) { CLAUDE("Claude"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen") }
+enum class LlmBackend(val label: String) { CLAUDE("Claude"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen"), CUSTOM("自訂") }
 
 /**
  * Every capability is an explicit opt-in. A capability that is off contributes no tools and no
@@ -35,8 +35,11 @@ data class AppSettings(
     val openAiKey: String = "",
     val deepSeekKey: String = "",
     val qwenKey: String = "",
+    val customKey: String = "",
+    val customBaseUrl: String = "",                // any OpenAI-compatible endpoint, e.g. Gemini / Groq / OpenRouter
+    val customModel: String = "",
     val llm: LlmBackend = LlmBackend.CLAUDE,
-    val claudeModel: String = "claude-opus-5",
+    val claudeModel: String = "claude-sonnet-5",
     val openAiChatModel: String = "gpt-4o",
     val deepSeekModel: String = "deepseek-chat",
     val qwenModel: String = "qwen-plus",
@@ -63,8 +66,11 @@ class Settings(private val context: Context) {
             openAiKey = p[K.openAiKey] ?: "",
             deepSeekKey = p[K.deepSeekKey] ?: "",
             qwenKey = p[K.qwenKey] ?: "",
+            customKey = p[K.customKey] ?: "",
+            customBaseUrl = p[K.customBaseUrl] ?: "",
+            customModel = p[K.customModel] ?: "",
             llm = p[K.llm]?.let { runCatching { LlmBackend.valueOf(it) }.getOrNull() } ?: LlmBackend.CLAUDE,
-            claudeModel = p[K.claudeModel] ?: "claude-opus-5",
+            claudeModel = p[K.claudeModel] ?: "claude-sonnet-5",
             openAiChatModel = p[K.openAiChatModel] ?: "gpt-4o",
             deepSeekModel = p[K.deepSeekModel] ?: "deepseek-chat",
             qwenModel = p[K.qwenModel] ?: "qwen-plus",
@@ -92,6 +98,9 @@ class Settings(private val context: Context) {
             p[K.openAiKey] = next.openAiKey
             p[K.deepSeekKey] = next.deepSeekKey
             p[K.qwenKey] = next.qwenKey
+            p[K.customKey] = next.customKey
+            p[K.customBaseUrl] = next.customBaseUrl
+            p[K.customModel] = next.customModel
             p[K.llm] = next.llm.name
             p[K.claudeModel] = next.claudeModel
             p[K.openAiChatModel] = next.openAiChatModel
@@ -120,6 +129,9 @@ class Settings(private val context: Context) {
         val openAiKey = stringPreferencesKey("openai_key")
         val deepSeekKey = stringPreferencesKey("deepseek_key")
         val qwenKey = stringPreferencesKey("qwen_key")
+        val customKey = stringPreferencesKey("custom_key")
+        val customBaseUrl = stringPreferencesKey("custom_base_url")
+        val customModel = stringPreferencesKey("custom_model")
         val llm = stringPreferencesKey("llm")
         val claudeModel = stringPreferencesKey("claude_model")
         val openAiChatModel = stringPreferencesKey("openai_chat_model")

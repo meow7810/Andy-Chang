@@ -67,7 +67,7 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         when (draft.llm) {
             LlmBackend.CLAUDE -> {
                 Secret(draft.anthropicKey, "Anthropic API key") { draft = draft.copy(anthropicKey = it) }
-                Plain(draft.claudeModel, "Claude model（預設 claude-opus-5）") { draft = draft.copy(claudeModel = it) }
+                Plain(draft.claudeModel, "Claude model（預設 claude-sonnet-5；想要最強改 claude-opus-5）") { draft = draft.copy(claudeModel = it) }
             }
             LlmBackend.OPENAI -> Plain(draft.openAiChatModel, "OpenAI chat model") { draft = draft.copy(openAiChatModel = it) }
             LlmBackend.DEEPSEEK -> {
@@ -77,6 +77,16 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             LlmBackend.QWEN -> {
                 Secret(draft.qwenKey, "Qwen (DashScope) API key") { draft = draft.copy(qwenKey = it) }
                 Plain(draft.qwenModel, "Qwen model（qwen-plus / qwen-max）") { draft = draft.copy(qwenModel = it) }
+            }
+            LlmBackend.CUSTOM -> {
+                Text(
+                    "任何 OpenAI 相容端點。例：Gemini https://generativelanguage.googleapis.com/v1beta/openai、" +
+                        "Groq https://api.groq.com/openai/v1、OpenRouter https://openrouter.ai/api/v1",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+                Plain(draft.customBaseUrl, "Base URL（到 /v1 為止，不含 /chat/completions）") { draft = draft.copy(customBaseUrl = it) }
+                Secret(draft.customKey, "API key") { draft = draft.copy(customKey = it) }
+                Plain(draft.customModel, "模型名稱（照供應商文件填）") { draft = draft.copy(customModel = it) }
             }
         }
 

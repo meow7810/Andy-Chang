@@ -6,7 +6,7 @@
 ## 技術
 
 - Kotlin + Jetpack Compose，minSdk 26 / compileSdk 35，AGP 8.7、Kotlin 2.0
-- LLM：Anthropic Java SDK 呼叫 Claude（預設 `claude-opus-5`），可切 OpenAI / DeepSeek / Qwen（OpenAI 相容端點，含 function calling）
+- LLM：Anthropic Java SDK 呼叫 Claude（預設 `claude-sonnet-5`，可改 `claude-opus-5`），可切 OpenAI / DeepSeek / Qwen，或自訂任何 OpenAI 相容端點（Gemini、Groq、OpenRouter 的免費額度都能接）
 - 語音辨識：OpenAI `gpt-4o-transcribe`（語言留空自動偵測中英文），或 Android 內建引擎（免費、多數手機可離線）
 - 聽寫鍵盤模式：用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出（你的鍵盤訂閱，不用 API）
 - 辨識結果先填進輸入框，2 秒沒動才送出；期間可修改或按「先不要送」

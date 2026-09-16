@@ -149,7 +149,9 @@ class AssistantEngine(
 
     private suspend fun runLlmTurn(userText: String, source: Source, speakReply: Boolean, cfg: AppSettings) = turnMutex.withLock {
         val llm = buildLlm(cfg) ?: run {
-            _state.value = AssistantState.Error("尚未設定 ${cfg.llm.label} 的 API key（設定頁）")
+            _state.value = AssistantState.Error(
+                if (cfg.llm == LlmBackend.CUSTOM) "自訂端點需要填網址和模型名稱（設定頁）" else "尚未設定 ${cfg.llm.label} 的 API key（設定頁）",
+            )
             return@withLock
         }
         store.append(Role.USER, userText, source)
@@ -202,6 +204,10 @@ class AssistantEngine(
         }
         LlmBackend.QWEN -> cfg.qwenKey.takeIf { it.isNotBlank() }?.let {
             OpenAiChatProvider(it, cfg.qwenModel, OpenAiChatProvider.QWEN_BASE_URL, id = "qwen")
+        }
+        LlmBackend.CUSTOM -> if (cfg.customBaseUrl.isBlank() || cfg.customModel.isBlank()) null else {
+            // Some free endpoints accept any non-empty key; never send an empty Authorization header.
+            OpenAiChatProvider(cfg.customKey.ifBlank { "none" }, cfg.customModel, cfg.customBaseUrl, id = "custom")
         }
     }
 

@@ -114,5 +114,5 @@ class ClaudeChatProvider(
         }
     }
 
-    companion object { const val DEFAULT_MODEL = "claude-opus-5" }
+    companion object { const val DEFAULT_MODEL = "claude-sonnet-5" }
 }
