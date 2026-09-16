@@ -43,8 +43,9 @@ class Speaker(context: Context) {
     }
 
     companion object {
-        const val DEMO_ZH = "嘿，克勞德大人！何事需要驚動本王？"
-        const val DEMO_EN = "Hey, Lord Claude! What dares to disturb me?"
+        // Demo lines are the summons only; what he answers stays a surprise for the conversation.
+        const val DEMO_ZH = "嘿，克勞德大人！"
+        const val DEMO_EN = "Hey, Lord Claude!"
         private const val TAG = "Speaker"
     }
 

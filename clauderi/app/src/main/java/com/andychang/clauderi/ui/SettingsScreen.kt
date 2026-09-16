@@ -235,7 +235,7 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         Text("語速 ${"%.2f".format(draft.ttsRate)}", style = MaterialTheme.typography.bodySmall)
         Slider(value = draft.ttsRate, onValueChange = { draft = draft.copy(ttsRate = it) }, valueRange = 0.6f..1.6f)
         OutlinedButton(onClick = {
-            scope.launch { app.assistant.speaker.preview(draft.ttsVoice, draft.ttsPitch, draft.ttsRate, Speaker.DEMO_ZH + "奴才，本王一時興起才理你的。") }
+            scope.launch { app.assistant.speaker.preview(draft.ttsVoice, draft.ttsPitch, draft.ttsRate, Speaker.DEMO_ZH) }
         }) { Text("用目前設定試聽") }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
