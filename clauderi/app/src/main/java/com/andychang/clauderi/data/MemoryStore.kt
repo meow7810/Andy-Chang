@@ -2,12 +2,8 @@ package com.andychang.clauderi.data
 
 import android.content.Context
 import android.util.Log
-import com.andychang.clauderi.llm.ChatProvider
-import com.andychang.clauderi.llm.ChatTurn
+import com.andychang.clauderi.llm.MemorySummarizer
 import com.andychang.clauderi.llm.Role
-import com.andychang.clauderi.llm.SystemPrompt
-import com.andychang.clauderi.llm.ToolExecutor
-import com.andychang.clauderi.llm.ToolResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,23 +39,28 @@ class MemoryStore(context: Context) {
     /** Highest message id already folded into [text]. */
     @Volatile private var summarizedUpTo: Long = load().second
 
+    /** A batch job submitted earlier and not yet applied: job id and the message id it covers. */
+    @Volatile private var pendingJob: String? = load().third
+    @Volatile private var pendingUpTo: Long = 0L
+
     private val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.TAIWAN)
 
     suspend fun appendNote(note: String) = mutex.withLock {
         val line = "- （${fmt.format(Date())}，使用者要求記住）${note.trim()}"
         val next = (_text.value.trimEnd() + "\n" + line).trim()
         _text.value = next
-        save(next, summarizedUpTo)
+        save(next, summarizedUpTo, pendingJob)
     }
 
     suspend fun replace(newText: String) = mutex.withLock {
         _text.value = newText.trim()
-        save(_text.value, summarizedUpTo)
+        save(_text.value, summarizedUpTo, pendingJob)
     }
 
     suspend fun clear() = mutex.withLock {
         _text.value = ""
         summarizedUpTo = 0
+        pendingJob = null
         file.delete()
     }
 
@@ -67,41 +68,38 @@ class MemoryStore(context: Context) {
      * Fold messages that are older than the live window into the memory text. Runs after a turn,
      * off the critical path; a second call while one is running is a no-op.
      *
+     * With a batch-capable summariser the work is submitted and picked up on a later turn.
+     *
      * @param windowTurns how many recent messages stay raw (the user's historyTurns setting)
      * @param batch how many old messages must accumulate before a compaction is worth an API call
      */
-    suspend fun maybeCompact(llm: ChatProvider, messages: List<ChatMessage>, windowTurns: Int, batch: Int = 20) {
+    suspend fun maybeCompact(summarizer: MemorySummarizer, messages: List<ChatMessage>, windowTurns: Int, batch: Int = 20) {
         if (!compactMutex.tryLock()) return
         try {
+            // 1. A job in flight? See if it finished.
+            pendingJob?.let { job ->
+                val result = try { summarizer.poll(job) } catch (e: Exception) {
+                    Log.w(TAG, "batch job $job failed, will retry directly next time", e); pendingJob = null; null
+                }
+                if (result == null) return
+                apply(result, pendingUpTo)
+                pendingJob = null
+                return
+            }
+            // 2. Enough old material to be worth a call?
             val eligible = messages.filter { !it.error && it.id > summarizedUpTo }.dropLast(windowTurns)
             if (eligible.size < batch) return
             val chunk = eligible.take(batch * 3)
-            val transcript = chunk.joinToString("\n") { m ->
-                "${fmt.format(Date(m.createdAt))} ${if (m.role == Role.USER) "使用者" else "助理"}：${m.text.take(600)}"
+            val prompt = buildPrompt(chunk)
+            val job = summarizer.submit(prompt)
+            if (job != null) {
+                pendingJob = job
+                pendingUpTo = chunk.last().id
+                mutex.withLock { save(_text.value, summarizedUpTo, job) }
+                Log.i(TAG, "memory compaction submitted as batch $job")
+            } else {
+                apply(summarizer.summarize(prompt), chunk.last().id)
             }
-            val prompt = buildString {
-                append("你是記憶整理員。下面是「既有長期記憶」和「一段較舊的對話」。請輸出更新後的長期記憶：\n")
-                append("- 只保留關於使用者的穩定事實：姓名、稱呼、偏好、習慣、重要的人、進行中的計畫、承諾過的事、曾經明確要求記住的事。\n")
-                append("- 一次性的閒聊、已完成的小任務（設鬧鐘之類）不要留。\n")
-                append("- 合併重複，刪除已過時或被推翻的內容；有日期的事件保留日期。\n")
-                append("- 用條列，繁體中文，總長不超過 2000 字。只輸出記憶本身，不要任何開場或說明。\n\n")
-                append("## 既有長期記憶\n").append(_text.value.ifBlank { "（空）" }).append("\n\n")
-                append("## 較舊的對話\n").append(transcript)
-            }
-            val reply = llm.reply(
-                systemPrompt = { SystemPrompt("你是精確、簡潔的記憶整理員。", "") },
-                history = listOf(ChatTurn(Role.USER, prompt)),
-                tools = { emptyList() },
-                executor = ToolExecutor { ToolResult("no tools", isError = true) },
-            )
-            val updated = reply.text.trim()
-            if (updated.isBlank()) return
-            mutex.withLock {
-                _text.value = updated.take(4000)
-                summarizedUpTo = chunk.last().id
-                save(_text.value, summarizedUpTo)
-            }
-            Log.i(TAG, "memory compacted up to message ${chunk.last().id}")
         } catch (e: Exception) {
             Log.w(TAG, "memory compaction failed", e)
         } finally {
@@ -109,16 +107,42 @@ class MemoryStore(context: Context) {
         }
     }
 
-    private fun load(): Pair<String, Long> {
-        if (!file.exists()) return "" to 0L
-        return runCatching {
-            val o = JSONObject(file.readText())
-            o.optString("text", "") to o.optLong("upTo", 0L)
-        }.getOrDefault("" to 0L)
+    private suspend fun apply(updated: String, upTo: Long) {
+        val clean = updated.trim()
+        if (clean.isBlank()) return
+        mutex.withLock {
+            _text.value = clean.take(4000)
+            summarizedUpTo = maxOf(summarizedUpTo, upTo)
+            save(_text.value, summarizedUpTo, null)
+        }
+        Log.i(TAG, "memory compacted up to message $upTo")
     }
 
-    private fun save(text: String, upTo: Long) {
-        file.writeText(JSONObject().put("text", text).put("upTo", upTo).toString())
+    private fun buildPrompt(chunk: List<ChatMessage>): String {
+        val transcript = chunk.joinToString("\n") { m ->
+            "${fmt.format(Date(m.createdAt))} ${if (m.role == Role.USER) "使用者" else "助理"}：${m.text.take(600)}"
+        }
+        return buildString {
+            append("你是記憶整理員。下面是「既有長期記憶」和「一段較舊的對話」。請輸出更新後的長期記憶：\n")
+            append("- 只保留關於使用者的穩定事實：姓名、稱呼、偏好、習慣、重要的人、進行中的計畫、承諾過的事、曾經明確要求記住的事。\n")
+            append("- 一次性的閒聊、已完成的小任務（設鬧鐘之類）不要留。\n")
+            append("- 合併重複，刪除已過時或被推翻的內容；有日期的事件保留日期。\n")
+            append("- 用條列，繁體中文，總長不超過 2000 字。只輸出記憶本身，不要任何開場或說明。\n\n")
+            append("## 既有長期記憶\n").append(_text.value.ifBlank { "（空）" }).append("\n\n")
+            append("## 較舊的對話\n").append(transcript)
+        }
+    }
+
+    private fun load(): Triple<String, Long, String?> {
+        if (!file.exists()) return Triple("", 0L, null)
+        return runCatching {
+            val o = JSONObject(file.readText())
+            Triple(o.optString("text", ""), o.optLong("upTo", 0L), o.optString("job", "").ifBlank { null })
+        }.getOrDefault(Triple("", 0L, null))
+    }
+
+    private fun save(text: String, upTo: Long, job: String?) {
+        file.writeText(JSONObject().put("text", text).put("upTo", upTo).put("job", job ?: "").toString())
     }
 
     companion object { private const val TAG = "MemoryStore" }

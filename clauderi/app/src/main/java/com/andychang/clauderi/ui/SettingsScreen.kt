@@ -138,6 +138,16 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Switch(checked = draft.longTermMemory, onCheckedChange = { draft = draft.copy(longTermMemory = it) })
         }
         if (draft.longTermMemory) {
+            if (draft.llm == LlmBackend.CLAUDE) {
+                Plain(draft.memoryModel, "整理記憶用的模型（預設 claude-haiku-4-5，便宜五倍）") { draft = draft.copy(memoryModel = it) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("整理記憶走 Batch API")
+                        Text("半價；結果幾分鐘到最多 24 小時後、下次對話時套用", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Switch(checked = draft.memoryUseBatch, onCheckedChange = { draft = draft.copy(memoryUseBatch = it) })
+                }
+            }
             val memoryText by app.memory.text.collectAsState()
             var editing by remember { mutableStateOf(false) }
             var memoryDraft by remember(memoryText) { mutableStateOf(memoryText) }

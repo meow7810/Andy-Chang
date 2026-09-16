@@ -19,6 +19,9 @@ import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.data.SttBackend
 import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ClaudeChatProvider
+import com.andychang.clauderi.llm.ClaudeMemorySummarizer
+import com.andychang.clauderi.llm.DirectSummarizer
+import com.andychang.clauderi.llm.MemorySummarizer
 import com.andychang.clauderi.llm.OpenAiChatProvider
 import com.andychang.clauderi.llm.Role
 import com.andychang.clauderi.llm.SystemPrompt
@@ -170,6 +173,7 @@ class AssistantEngine(
             )
             return@withLock
         }
+        speaker.stop()   // a new question interrupts whatever is still being read aloud
         store.append(Role.USER, userText, source)
         _state.value = AssistantState.Thinking(userText)
 
@@ -192,7 +196,7 @@ class AssistantEngine(
             return@withLock
         }
         store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
-        if (cfg.longTermMemory) scope.launch { memory.maybeCompact(llm, store.messages.value, cfg.historyTurns) }
+        if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
         if (speakReply && reply.text.isNotBlank()) {
             _state.value = AssistantState.Speaking(reply.text)
@@ -226,6 +230,14 @@ class AssistantEngine(
         }
         return SystemPrompt(stable, volatile)
     }
+
+    /** Claude backend: cheap model + Batch. Anything else: the chat provider itself, synchronously. */
+    private fun buildSummarizer(cfg: AppSettings, llm: ChatProvider): MemorySummarizer =
+        if (cfg.llm == LlmBackend.CLAUDE && cfg.anthropicKey.isNotBlank()) {
+            ClaudeMemorySummarizer(cfg.anthropicKey, cfg.memoryModel.ifBlank { ClaudeMemorySummarizer.DEFAULT_MODEL }, cfg.memoryUseBatch)
+        } else {
+            DirectSummarizer(llm)
+        }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel) }

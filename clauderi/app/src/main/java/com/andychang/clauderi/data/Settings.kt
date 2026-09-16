@@ -62,6 +62,8 @@ data class AppSettings(
     val allowAiCapabilityRequests: Boolean = true,  // model may ask (in chat) to enable a capability; user still confirms
     val persona: Persona = Persona.LORD,
     val longTermMemory: Boolean = true,             // fold old turns into a curated memory file; off = sliding window only
+    val memoryModel: String = "claude-haiku-4-5",   // compaction is bookkeeping, not reasoning: use the cheap model
+    val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
     val wakeGreeting: Boolean = true,               // speak "何事需要驚動本座？" when summoned by long-press Home
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
@@ -100,6 +102,8 @@ class Settings(private val context: Context) {
             allowAiCapabilityRequests = p[K.allowAiRequests] ?: true,
             persona = p[K.persona]?.let { runCatching { Persona.valueOf(it) }.getOrNull() } ?: Persona.LORD,
             longTermMemory = p[K.longTermMemory] ?: true,
+            memoryModel = p[K.memoryModel] ?: "claude-haiku-4-5",
+            memoryUseBatch = p[K.memoryUseBatch] ?: true,
             wakeGreeting = p[K.wakeGreeting] ?: true,
         )
     }
@@ -137,6 +141,8 @@ class Settings(private val context: Context) {
             p[K.allowAiRequests] = next.allowAiCapabilityRequests
             p[K.persona] = next.persona.name
             p[K.longTermMemory] = next.longTermMemory
+            p[K.memoryModel] = next.memoryModel
+            p[K.memoryUseBatch] = next.memoryUseBatch
             p[K.wakeGreeting] = next.wakeGreeting
         }
     }
@@ -174,6 +180,8 @@ class Settings(private val context: Context) {
         val allowAiRequests = booleanPreferencesKey("allow_ai_requests")
         val persona = stringPreferencesKey("persona")
         val longTermMemory = booleanPreferencesKey("long_term_memory")
+        val memoryModel = stringPreferencesKey("memory_model")
+        val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
     }
 }
