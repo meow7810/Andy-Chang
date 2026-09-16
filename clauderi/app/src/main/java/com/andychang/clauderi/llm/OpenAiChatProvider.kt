@@ -56,6 +56,18 @@ class OpenAiChatProvider(
                     JSONObject().put("role", "tool").put("tool_call_id", c.getString("id"))
                         .put("content", if (r.isError) "ERROR: ${r.text}" else r.text),
                 )
+                r.imageJpeg?.let { jpeg ->
+                    // OpenAI-style tool messages cannot carry images; send it as the next user turn.
+                    val dataUrl = "data:image/jpeg;base64," + android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP)
+                    messages.put(
+                        JSONObject().put("role", "user").put(
+                            "content",
+                            JSONArray()
+                                .put(JSONObject().put("type", "text").put("text", "（這是剛拍的照片）"))
+                                .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", dataUrl))),
+                        ),
+                    )
+                }
             }
         }
         ChatReply("（工具呼叫太多次，先停在這裡。）", used)

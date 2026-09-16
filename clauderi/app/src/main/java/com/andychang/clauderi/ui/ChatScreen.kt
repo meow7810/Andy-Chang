@@ -130,6 +130,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         }
 
         CapabilityRequestCard(app)
+        CameraLauncher(app)
 
         if (armed) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -207,6 +208,7 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
                         when (req.capability) {
                             CapabilityId.ACTIONS -> finish(true)
                             CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
+                            CapabilityId.CAMERA -> finish(true)
                             CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
                             CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                             CapabilityId.NOTIFICATIONS ->
@@ -223,6 +225,21 @@ private fun CapabilityRequestCard(app: ClaudeRiApp) {
     }
 }
 
+/** Opens the system camera when take_photo asks for it, and reports back to the tool. */
+@Composable
+private fun CameraLauncher(app: ClaudeRiApp) {
+    val request by app.capabilities.camera.pending.collectAsState()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> app.capabilities.camera.onPhotoResult(ok) }
+    LaunchedEffect(request) {
+        request?.let { launcher.launch(it.target) }
+    }
+    request?.let { req ->
+        if (req.hint.isNotBlank()) {
+            Text("📷 ${req.hint}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+    }
+}
+
 /** Whether the Android-side permission behind a capability is already in place. */
 private fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings): Boolean = when (cap) {
     CapabilityId.NOTIFICATIONS -> (app.capabilities.byId(cap) as NotificationCapability).listenerEnabled()
@@ -231,6 +248,7 @@ private fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings): 
     CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
     CapabilityId.ACTIONS -> true
     CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
+    CapabilityId.CAMERA -> true
 }
 
 private fun stateLabel(s: AssistantState) = when (s) {

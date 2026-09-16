@@ -24,6 +24,8 @@
         <intent><action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" /></intent>
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="google.navigation" /></intent>
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="geo" /></intent>
+        <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
+        <intent><action android:name="android.intent.action.SEND" /><data android:mimeType="image/jpeg" /></intent>
         <intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent>
         <!-- to find the phone's real speech engine (our own RecognitionService is only a proxy) -->
         <intent><action android:name="android.speech.RecognitionService" /></intent>
@@ -84,6 +86,15 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Capability: camera. Shares cache/photos with the camera app and messaging apps. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- Capability 5: screen awareness (accessibility). Off by default, last in the list on purpose. -->
         <service

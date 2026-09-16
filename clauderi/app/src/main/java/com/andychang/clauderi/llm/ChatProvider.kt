@@ -34,7 +34,8 @@ data class ToolCall(val id: String, val name: String, val args: JSONObject) {
     fun bool(key: String): Boolean? = str(key)?.toBooleanStrictOrNull()
 }
 
-data class ToolResult(val text: String, val isError: Boolean = false)
+/** [imageJpeg] lets a tool hand the model a picture (Claude: image block inside the tool_result). */
+data class ToolResult(val text: String, val isError: Boolean = false, val imageJpeg: ByteArray? = null)
 
 fun interface ToolExecutor {
     suspend fun execute(call: ToolCall): ToolResult

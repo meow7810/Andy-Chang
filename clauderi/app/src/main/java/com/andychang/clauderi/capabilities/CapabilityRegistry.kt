@@ -20,7 +20,10 @@ class CapabilityRegistry(context: Context, private val settings: Settings, val b
         ActionsCapability(context),
         ScreenCapability(context),
         GmailCapability(context),
+        CameraCapability(context),
     )
+
+    val camera: CameraCapability get() = byId(CapabilityId.CAMERA) as CameraCapability
 
     fun byId(id: CapabilityId): Capability = all.first { it.id == id }
 

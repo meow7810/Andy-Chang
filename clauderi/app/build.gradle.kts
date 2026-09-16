@@ -57,4 +57,5 @@ dependencies {
     // Gmail capability: IMAP with an app password (javax.mail for Android)
     implementation(libs.android.mail)
     implementation(libs.android.activation)
+    implementation(libs.androidx.exifinterface)
 }

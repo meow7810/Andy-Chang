@@ -4,7 +4,10 @@ import com.anthropic.client.AnthropicClient
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.core.JsonValue
 import com.anthropic.errors.AnthropicServiceException
+import android.util.Base64
+import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.CacheControlEphemeral
+import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.MessageParam
@@ -86,9 +89,26 @@ class ClaudeChatProvider(
                     JSONObject(use._input().convert(Map::class.java) as Map<String, Any?>)
                 }.getOrElse { JSONObject() }
                 val r = executor.execute(ToolCall(use.id(), use.name(), args))
-                ContentBlockParam.ofToolResult(
-                    ToolResultBlockParam.builder().toolUseId(use.id()).content(r.text).isError(r.isError).build(),
-                )
+                val builder = ToolResultBlockParam.builder().toolUseId(use.id()).isError(r.isError)
+                if (r.imageJpeg == null) {
+                    builder.content(r.text)
+                } else {
+                    val image = ImageBlockParam.builder().source(
+                        Base64ImageSource.builder()
+                            .mediaType(Base64ImageSource.MediaType.IMAGE_JPEG)
+                            .data(Base64.encodeToString(r.imageJpeg, Base64.NO_WRAP))
+                            .build(),
+                    ).build()
+                    builder.content(
+                        ToolResultBlockParam.Content.ofBlocks(
+                            listOf(
+                                ToolResultBlockParam.Content.Block.ofImage(image),
+                                ToolResultBlockParam.Content.Block.ofText(r.text),
+                            ),
+                        ),
+                    )
+                }
+                ContentBlockParam.ofToolResult(builder.build())
             }
             messages += MessageParam.builder().role(MessageParam.Role.USER).contentOfBlockParams(results).build()
         }
