@@ -27,6 +27,7 @@ class CapabilityRegistry(
         ScreenCapability(context),
         GmailCapability(context),
         CameraCapability(context),
+        WebCapability(context),
     )
 
     val camera: CameraCapability get() = byId(CapabilityId.CAMERA) as CameraCapability

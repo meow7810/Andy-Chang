@@ -15,8 +15,12 @@ data class ToolParam(
     val enum: List<String>? = null,
 )
 
-/** Provider-neutral tool definition; each provider converts it to its own wire format. */
-data class ToolSpec(val name: String, val description: String, val params: List<ToolParam> = emptyList()) {
+/**
+ * Provider-neutral tool definition; each provider converts it to its own wire format.
+ * [server] = executed on the model provider's side (e.g. Claude web search): no client code runs,
+ * providers without an equivalent simply omit it.
+ */
+data class ToolSpec(val name: String, val description: String, val params: List<ToolParam> = emptyList(), val server: Boolean = false) {
     /** JSON-Schema `properties` object, shared by the Claude and OpenAI formats. */
     fun schemaProperties(): JSONObject = JSONObject().also { props ->
         params.forEach { p ->

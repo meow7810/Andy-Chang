@@ -74,7 +74,7 @@ internal fun CapabilityRequestCard(app: ClaudeRiApp) {
                         when (req.capability) {
                             CapabilityId.ACTIONS -> finish(true)
                             CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
-                            CapabilityId.CAMERA -> finish(true)
+                            CapabilityId.CAMERA, CapabilityId.WEB -> finish(true)
                             CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
                             CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                             CapabilityId.NOTIFICATIONS ->
@@ -99,5 +99,5 @@ internal fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings):
     CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
     CapabilityId.ACTIONS -> true
     CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
-    CapabilityId.CAMERA -> true
+    CapabilityId.CAMERA, CapabilityId.WEB -> true
 }

@@ -35,7 +35,7 @@ class OpenAiChatProvider(
 
         repeat(MAX_TOOL_ROUNDS) {
             messages.getJSONObject(0).put("content", systemPrompt().full)
-            val toolsJson = toolsJson(tools())
+            val toolsJson = toolsJson(tools().filter { !it.server })
             val payload = JSONObject().put("model", model).put("messages", messages)
             if (toolsJson.length() > 0) payload.put("tools", toolsJson)
             val message = post(payload)

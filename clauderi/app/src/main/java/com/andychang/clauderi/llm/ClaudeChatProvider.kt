@@ -17,6 +17,8 @@ import com.anthropic.models.messages.TextBlockParam
 import com.anthropic.models.messages.ThinkingConfigAdaptive
 import com.anthropic.models.messages.Tool
 import com.anthropic.models.messages.ToolResultBlockParam
+import com.anthropic.models.messages.UserLocation
+import com.anthropic.models.messages.WebSearchTool20260209
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -52,7 +54,8 @@ class ClaudeChatProvider(
         val used = mutableListOf<String>()
 
         repeat(MAX_TOOL_ROUNDS) {
-            val sdkTools = tools().map { toSdkTool(it) }
+            val specs = tools()
+            val sdkTools = specs.filter { !it.server }.map { toSdkTool(it) }
             val builder = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(maxTokens)
@@ -62,6 +65,14 @@ class ClaudeChatProvider(
                 .systemOfTextBlockParams(systemBlocks(systemPrompt()))
                 .messages(messages)
             sdkTools.forEach { builder.addTool(it) }
+            if (specs.any { it.server && it.name == "web_search" }) {
+                builder.addTool(
+                    WebSearchTool20260209.builder()
+                        .maxUses(5L)
+                        .userLocation(UserLocation.builder().city("Taipei").country("TW").timezone("Asia/Taipei").build())
+                        .build(),
+                )
+            }
 
             val response = try {
                 client.messages().create(builder.build())
@@ -73,7 +84,10 @@ class ClaudeChatProvider(
 
             messages += response.toParam()
             val text = response.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim()
+            if (response.content().any { it.serverToolUse().isPresent } && "web_search" !in used) used += "web_search"
 
+            // Server-side tools (web search) can hand the turn back mid-way; just ask it to continue.
+            if (stop == StopReason.PAUSE_TURN) return@repeat
             if (stop != StopReason.TOOL_USE) return@withContext ChatReply(text, used)
 
             val results = response.content().mapNotNull { it.toolUse().orElse(null) }.map { use ->

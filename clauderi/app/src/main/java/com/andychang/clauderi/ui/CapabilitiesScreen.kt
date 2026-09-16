@@ -100,7 +100,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                                 CapabilityId.NOTIFICATIONS -> if (!(cap as NotificationCapability).listenerEnabled()) open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                 CapabilityId.SCREEN -> if (!(cap as ScreenCapability).serviceEnabled()) open(SysSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                CapabilityId.ACTIONS, CapabilityId.GMAIL, CapabilityId.CAMERA -> Unit
+                                CapabilityId.ACTIONS, CapabilityId.GMAIL, CapabilityId.CAMERA, CapabilityId.WEB -> Unit
                             }
                         })
                     }
@@ -131,6 +131,9 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                             }) { Text("再次要求權限") }
                         }
                         CapabilityId.ACTIONS, CapabilityId.CAMERA -> Unit
+                        CapabilityId.WEB -> if (on && cfg.llm != com.andychang.clauderi.data.LlmBackend.CLAUDE) {
+                            Text("目前選的不是 Claude 後端，網路搜尋不會生效", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB74D))
+                        }
                         CapabilityId.GMAIL -> if (on) {
                             val ready = cfg.gmailAddress.isNotBlank() && cfg.gmailAppPassword.isNotBlank()
                             Text(
