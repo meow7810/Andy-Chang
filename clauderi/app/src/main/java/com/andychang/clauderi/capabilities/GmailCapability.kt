@@ -62,7 +62,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         ),
         ToolSpec("read_email", "讀取一封信的完整純文字內文（最多 4000 字）。", listOf(ToolParam("id", "string", "search_email 回傳的 id"))),
         ToolSpec(
-            "archive_emails", "把符合 Gmail 搜尋語法的信從收件匣封存（移出 INBOX，仍可在「所有郵件」找到，可逆）。一次最多 2000 封。執行前必須先讓使用者確認。",
+            "archive_emails", "把符合 Gmail 搜尋語法的信從收件匣封存（移出 INBOX，仍可在「所有郵件」找到，可逆）。一次最多 20000 封，大量時會跑幾分鐘。執行前必須先讓使用者確認。",
             listOf(ToolParam("query", "string", "Gmail 搜尋語法，例如 from:notifications@github.com older_than:30d")),
         ),
         ToolSpec(
@@ -186,9 +186,9 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         try {
             val uids = if (query.all { it.code < 128 }) gmailRawSearch(inbox, query) else standardSearch(inbox, query)
             if (uids.isEmpty()) return ok("收件匣裡沒有符合「$query」的信。")
-            val batch = uids.take(2000)
+            val batch = uids.take(20_000)
             var done = 0
-            batch.chunked(200).forEach { chunk ->
+            batch.chunked(500).forEach { chunk ->
                 val msgs = inbox.getMessagesByUID(chunk.toLongArray()).filterNotNull().toTypedArray()
                 inbox.setFlags(msgs, Flags(Flags.Flag.DELETED), true)
                 done += msgs.size
