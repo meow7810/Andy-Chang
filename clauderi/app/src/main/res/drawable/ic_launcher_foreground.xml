@@ -1,6 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder in the "Lord Claude" leather-badge palette: dark inset, gold spiked C.
+     Replace with the real artwork via New > Image Asset. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#4FC3F7"
-        android:pathData="M22,46h20a6,6 0 0 1 6,6v8a6,6 0 0 1 -6,6h-20a6,6 0 0 1 -6,-6v-8a6,6 0 0 1 6,-6zM66,46h20a6,6 0 0 1 6,6v8a6,6 0 0 1 -6,6h-20a6,6 0 0 1 -6,-6v-8a6,6 0 0 1 6,-6zM48,54h12v4h-12z"/>
+    <!-- dark leather inset -->
+    <path android:fillColor="#3B2216"
+        android:pathData="M30,30 h48 a6,6 0 0 1 6,6 v36 a6,6 0 0 1 -6,6 h-48 a6,6 0 0 1 -6,-6 v-36 a6,6 0 0 1 6,-6 z" />
+    <!-- stitching -->
+    <path android:strokeColor="#E8B36A" android:strokeWidth="1" android:fillColor="#00000000"
+        android:pathData="M33,33 h42 a3,3 0 0 1 3,3 v36 a3,3 0 0 1 -3,3 h-42 a3,3 0 0 1 -3,-3 v-36 a3,3 0 0 1 3,-3 z" />
+    <!-- gold C -->
+    <path android:strokeColor="#D9A441" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M66,42 A16,16 0 1 0 66,66" />
+    <!-- spikes -->
+    <path android:fillColor="#D9A441"
+        android:pathData="M66,42 l6,-8 l-1,10 z M66,66 l6,8 l-1,-10 z M40,54 l-9,-4 l8,-2 z M40,54 l-9,4 l8,2 z" />
+    <!-- wing -->
+    <path android:fillColor="#E8B36A"
+        android:pathData="M42,40 l-14,-10 l10,2 l-6,-6 l12,6 l-2,-6 l7,10 z" />
 </vector>
