@@ -23,11 +23,19 @@ class OpenAiSpeechToText(
 
     override val id = "openai"
 
+    private companion object {
+        const val ZH_PROMPT = "以下是使用者對 AI 眼鏡助理說的話，台灣繁體中文口語，可能夾雜英文單字。"
+        const val GENERIC_PROMPT = "Short spoken commands and questions to a voice assistant."
+    }
+
     override suspend fun transcribe(wav: ByteArray, languageHint: String?): String = withContext(Dispatchers.IO) {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("model", model)
             .addFormDataPart("response_format", "json")
             .apply { languageHint?.let { addFormDataPart("language", it) } }
+            // Biases the model toward Taiwanese Traditional Chinese and away from guessing a
+            // random language when the first SCO frames are silence/noise.
+            .addFormDataPart("prompt", if (languageHint == "zh") ZH_PROMPT else GENERIC_PROMPT)
             .addFormDataPart("file", "speech.wav", wav.toRequestBody("audio/wav".toMediaType()))
             .build()
         val req = Request.Builder()
