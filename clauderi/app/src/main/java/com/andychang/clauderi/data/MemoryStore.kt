@@ -5,6 +5,7 @@ import android.util.Log
 import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ChatTurn
 import com.andychang.clauderi.llm.Role
+import com.andychang.clauderi.llm.SystemPrompt
 import com.andychang.clauderi.llm.ToolExecutor
 import com.andychang.clauderi.llm.ToolResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,7 +89,7 @@ class MemoryStore(context: Context) {
                 append("## 較舊的對話\n").append(transcript)
             }
             val reply = llm.reply(
-                systemPrompt = { "你是精確、簡潔的記憶整理員。" },
+                systemPrompt = { SystemPrompt("你是精確、簡潔的記憶整理員。", "") },
                 history = listOf(ChatTurn(Role.USER, prompt)),
                 tools = { emptyList() },
                 executor = ToolExecutor { ToolResult("no tools", isError = true) },

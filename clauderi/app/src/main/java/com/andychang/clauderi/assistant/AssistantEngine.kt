@@ -21,6 +21,7 @@ import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ClaudeChatProvider
 import com.andychang.clauderi.llm.OpenAiChatProvider
 import com.andychang.clauderi.llm.Role
+import com.andychang.clauderi.llm.SystemPrompt
 import com.andychang.clauderi.llm.ToolExecutor
 import com.andychang.clauderi.stt.AndroidSpeechToText
 import com.andychang.clauderi.stt.OpenAiSpeechToText
@@ -200,10 +201,9 @@ class AssistantEngine(
         _state.value = AssistantState.Idle
     }
 
-    private fun buildSystemPrompt(cfg: AppSettings): String {
-        val now = SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())
+    private fun buildSystemPrompt(cfg: AppSettings): SystemPrompt {
         val caps = capabilities.promptSections(cfg)
-        return buildString {
+        val stable = buildString {
             append(Personas.prompt(cfg.persona))
             append("\n\n使用者是台灣人，預設用繁體中文回答，使用者用英文就用英文。回答簡短，適合朗讀；需要條列時最多三點。")
             append("\n新增行程時，只要提到地點就一定填 location（完整地址或店名），Google 日曆會據此在該出發時提醒並導航。")
@@ -214,13 +214,17 @@ class AssistantEngine(
                 append("\n\n使用者目前沒有授權任何手機能力給你，你只能純聊天；被要求操作手機時直說目前沒有授權。")
             }
             if (cfg.customInstructions.isNotBlank()) append("\n\n## 使用者的額外指示\n").append(cfg.customInstructions)
+        }
+        val volatile = buildString {
             if (cfg.longTermMemory) {
                 val mem = memory.text.value
-                append("\n\n## 長期記憶（關於使用者，跨對話保留）\n")
+                append("## 長期記憶（關於使用者，跨對話保留）\n")
                 append(mem.ifBlank { "（還沒有。使用者說「記住」或透露長期有用的事時，用 remember 工具寫入。）" })
+                append("\n\n")
             }
-            append("\n\n（現在時間：").append(now).append("）")
+            append("（現在時間：").append(SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())).append("）")
         }
+        return SystemPrompt(stable, volatile)
     }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {

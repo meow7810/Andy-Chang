@@ -25,7 +25,7 @@ class OpenAiChatProvider(
 ) : ChatProvider {
 
     override suspend fun reply(
-        systemPrompt: suspend () -> String, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
+        systemPrompt: suspend () -> SystemPrompt, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
     ): ChatReply = withContext(Dispatchers.IO) {
         val messages = JSONArray().put(JSONObject().put("role", "system").put("content", ""))
         for (t in history) {
@@ -34,7 +34,7 @@ class OpenAiChatProvider(
         val used = mutableListOf<String>()
 
         repeat(MAX_TOOL_ROUNDS) {
-            messages.getJSONObject(0).put("content", systemPrompt())
+            messages.getJSONObject(0).put("content", systemPrompt().full)
             val toolsJson = toolsJson(tools())
             val payload = JSONObject().put("model", model).put("messages", messages)
             if (toolsJson.length() > 0) payload.put("tools", toolsJson)

@@ -41,7 +41,7 @@ class ClaudeChatProvider(
     private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
 
     override suspend fun reply(
-        systemPrompt: suspend () -> String, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
+        systemPrompt: suspend () -> SystemPrompt, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
     ): ChatReply = withContext(Dispatchers.IO) {
         val messages = history.map { turn ->
             MessageParam.builder()
@@ -57,15 +57,9 @@ class ClaudeChatProvider(
                 .model(model)
                 .maxTokens(maxTokens)
                 .thinking(ThinkingConfigAdaptive.builder().build())
-                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
-                .systemOfTextBlockParams(
-                    listOf(
-                        TextBlockParam.builder()
-                            .text(systemPrompt())
-                            .cacheControl(CacheControlEphemeral.builder().build())
-                            .build(),
-                    ),
-                )
+                // Phone-assistant turns are short; LOW keeps thinking tokens (billed as output) down.
+                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
+                .systemOfTextBlockParams(systemBlocks(systemPrompt()))
                 .messages(messages)
             sdkTools.forEach { builder.addTool(it) }
 
@@ -113,6 +107,15 @@ class ClaudeChatProvider(
             messages += MessageParam.builder().role(MessageParam.Role.USER).contentOfBlockParams(results).build()
         }
         ChatReply("（工具呼叫太多次，先停在這裡。）", used)
+    }
+
+    /** Stable text first with the cache breakpoint; volatile text (memory, clock) after it, uncached. */
+    private fun systemBlocks(sp: SystemPrompt): List<TextBlockParam> {
+        val blocks = mutableListOf(
+            TextBlockParam.builder().text(sp.stable).cacheControl(CacheControlEphemeral.builder().build()).build(),
+        )
+        if (sp.volatile.isNotBlank()) blocks += TextBlockParam.builder().text(sp.volatile).build()
+        return blocks
     }
 
     private fun toSdkTool(spec: ToolSpec): Tool {
