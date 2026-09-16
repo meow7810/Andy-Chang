@@ -72,6 +72,14 @@ fun SettingsScreen(app: CyanApp, modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(), singleLine = true)
         OutlinedTextField(draft.openAiChatModel, { draft = draft.copy(openAiChatModel = it) }, label = { Text("OpenAI chat model") },
             modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(draft.deepSeekKey, { draft = draft.copy(deepSeekKey = it) }, label = { Text("DeepSeek API key") },
+            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(draft.deepSeekModel, { draft = draft.copy(deepSeekModel = it) }, label = { Text("DeepSeek model（deepseek-chat / deepseek-reasoner）") },
+            modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(draft.qwenKey, { draft = draft.copy(qwenKey = it) }, label = { Text("Qwen (DashScope) API key") },
+            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(draft.qwenModel, { draft = draft.copy(qwenModel = it) }, label = { Text("Qwen model（qwen-plus / qwen-turbo / qwen-max）") },
+            modifier = Modifier.fillMaxWidth(), singleLine = true)
 
         HorizontalDivider()
         Text("角色", style = MaterialTheme.typography.titleMedium)

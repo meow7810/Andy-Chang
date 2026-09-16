@@ -5,7 +5,7 @@
 | 層 | 原廠 App | CyanMind |
 |---|---|---|
 | 語音辨識 | 原廠雲端（常聽錯） | OpenAI `gpt-4o-transcribe`（預設）或 Typeless（可插拔） |
-| 對話模型 | Qwen，只記 10 組來回 | Claude（預設 `claude-opus-5`）或 OpenAI，歷史全部保存在手機，送多少輪自己設定 |
+| 對話模型 | Qwen，只記 10 組來回 | Claude（預設 `claude-opus-5`）、OpenAI、DeepSeek 或 Qwen，歷史全部保存在手機，送多少輪自己設定 |
 | 互動方式 | 只能講 | 講話 **和** 打字都可以，同一份記憶 |
 | 眼鏡韌體 | 原廠 | **完全不動**，不需要改機 |
 

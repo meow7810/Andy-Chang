@@ -179,6 +179,12 @@ class AssistantEngine(
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel) }
         LlmBackend.OPENAI -> cfg.openAiKey.takeIf { it.isNotBlank() }?.let { OpenAiChatProvider(it, cfg.openAiChatModel) }
+        LlmBackend.DEEPSEEK -> cfg.deepSeekKey.takeIf { it.isNotBlank() }?.let {
+            OpenAiChatProvider(it, cfg.deepSeekModel, OpenAiChatProvider.DEEPSEEK_BASE_URL, id = "deepseek")
+        }
+        LlmBackend.QWEN -> cfg.qwenKey.takeIf { it.isNotBlank() }?.let {
+            OpenAiChatProvider(it, cfg.qwenModel, OpenAiChatProvider.QWEN_BASE_URL, id = "qwen")
+        }
     }
 
     companion object { private const val TAG = "AssistantEngine" }
