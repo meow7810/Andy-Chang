@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -183,6 +184,31 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 FilterChip(selected = draft.persona == p, onClick = { draft = draft.copy(persona = p) }, label = { Text(p.label) })
             }
         }
+        Text("聲音", style = MaterialTheme.typography.titleSmall)
+        val voices = remember { app.assistant.speaker.voices() }
+        if (voices.isEmpty()) {
+            Text("手機沒有可用的離線中文/英文語音。設定 → 系統 → 文字轉語音 下載語音包後再回來。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                FilterChip(selected = draft.ttsVoice.isBlank(), onClick = { draft = draft.copy(ttsVoice = "") }, label = { Text("系統預設") })
+                voices.forEach { (name, label) ->
+                    FilterChip(
+                        selected = draft.ttsVoice == name, onClick = { draft = draft.copy(ttsVoice = name) },
+                        label = { Text("$label  ${name.substringAfterLast('-').take(24)}") },
+                    )
+                }
+            }
+        }
+        Text("音高 ${"%.2f".format(draft.ttsPitch)}（低 = 魔王）", style = MaterialTheme.typography.bodySmall)
+        Slider(value = draft.ttsPitch, onValueChange = { draft = draft.copy(ttsPitch = it) }, valueRange = 0.5f..1.5f)
+        Text("語速 ${"%.2f".format(draft.ttsRate)}", style = MaterialTheme.typography.bodySmall)
+        Slider(value = draft.ttsRate, onValueChange = { draft = draft.copy(ttsRate = it) }, valueRange = 0.6f..1.6f)
+        OutlinedButton(onClick = {
+            scope.launch {
+                app.assistant.speaker.apply { voiceName = draft.ttsVoice; pitch = draft.ttsPitch; rate = draft.ttsRate }
+                app.assistant.speaker.speak("何事需要驚動本王？奴才，本王一時興起才理你的。")
+            }
+        }) { Text("試聽") }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text("長按 Home 召喚時先說「何事需要驚動本王？」")

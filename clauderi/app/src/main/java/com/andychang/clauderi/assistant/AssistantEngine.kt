@@ -71,7 +71,7 @@ class AssistantEngine(
     private val capabilities: CapabilityRegistry,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val speaker = Speaker(context)
+    val speaker = Speaker(context)
     private val recorder = MicRecorder(context)
     private val androidStt = AndroidSpeechToText(context)
     private val turnMutex = Mutex()
@@ -90,6 +90,9 @@ class AssistantEngine(
         // Keep the always-on services in sync with the user's switches.
         scope.launch {
             settings.flow.collect { cfg ->
+                speaker.voiceName = cfg.ttsVoice
+                speaker.pitch = cfg.ttsPitch
+                speaker.rate = cfg.ttsRate
                 NotificationStore.enabled = cfg.has(CapabilityId.NOTIFICATIONS)
                 NotificationStore.allowedPackages = cfg.notificationApps
                 ScreenReaderService.enabledInApp = cfg.has(CapabilityId.SCREEN)

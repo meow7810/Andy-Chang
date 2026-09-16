@@ -19,10 +19,27 @@ class Speaker(context: Context) {
         ready.complete(status == TextToSpeech.SUCCESS)
     }
 
+    /** Voice name (from [voices]), pitch and rate. Applied on the next [speak]. */
+    @Volatile var voiceName: String = ""
+    @Volatile var pitch: Float = 1.0f
+    @Volatile var rate: Float = 1.0f
+
+    /** Installed voices for Chinese / English, name -> locale label. Empty until the engine is ready. */
+    fun voices(): List<Pair<String, String>> = runCatching {
+        tts.voices.orEmpty()
+            .filter { v -> v.locale.language == "zh" || v.locale.language == "en" }
+            .filter { v -> !v.isNetworkConnectionRequired }
+            .sortedWith(compareBy({ it.locale.language != "zh" }, { it.locale.toString() }, { it.name }))
+            .map { it.name to it.locale.displayName }
+    }.getOrDefault(emptyList())
+
     suspend fun speak(text: String, locale: Locale = Locale.TRADITIONAL_CHINESE) {
         if (!ready.await()) { Log.w(TAG, "TTS engine unavailable"); return }
         if (text.isBlank()) return
-        tts.setLanguage(locale)
+        val chosen = voiceName.takeIf { it.isNotBlank() }?.let { name -> runCatching { tts.voices?.firstOrNull { it.name == name } }.getOrNull() }
+        if (chosen != null) tts.voice = chosen else tts.setLanguage(locale)
+        tts.setPitch(pitch.coerceIn(0.5f, 2.0f))
+        tts.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
         tts.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANT)

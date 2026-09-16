@@ -24,6 +24,10 @@ import javax.mail.Part
 import javax.mail.Session
 import javax.mail.internet.InternetAddress
 import javax.mail.internet.MimeUtility
+import javax.mail.search.BodyTerm
+import javax.mail.search.FromStringTerm
+import javax.mail.search.OrTerm
+import javax.mail.search.SubjectTerm
 
 /**
  * Gmail over IMAP with a Google "app password" (Google's official mechanism for third-party
@@ -39,7 +43,8 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
     private val fmt = SimpleDateFormat("MM/dd HH:mm", Locale.TAIWAN)
 
     override fun promptSection(settings: AppSettings) =
-        "你可以用 search_email 搜尋使用者的 Gmail（Gmail 搜尋語法：from:、subject:、newer_than:7d、is:unread、has:attachment），" +
+        "你可以用 search_email 搜尋使用者的 Gmail（Gmail 搜尋語法：from:、subject:、newer_than:7d、is:unread、has:attachment；" +
+            "盡量用英文語法組合條件，只有真的需要中文關鍵字時才放中文，中文查詢只會比對主旨、寄件者和內文），" +
             "用 read_email 讀完整內文。搜尋只回摘要；內文要使用者明確要求才讀。唯讀，不能寄信或刪信。"
 
     override fun tools(settings: AppSettings) = listOf(
@@ -104,21 +109,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
 
     private fun search(folder: IMAPFolder, query: String, max: Int): ToolResult {
         if (query.isBlank()) return err("缺少 query")
-        @Suppress("UNCHECKED_CAST")
-        val uids = folder.doCommand { p ->
-            val args = Argument().writeAtom("CHARSET").writeAtom("UTF-8").writeAtom("X-GM-RAW").writeString(query, "UTF-8")
-            val responses = p.command("UID SEARCH", args)
-            val found = mutableListOf<Long>()
-            for (r in responses) {
-                if (r is IMAPResponse && r.keyEquals("SEARCH")) {
-                    var n = r.readLong()
-                    while (n != -1L) { found += n; n = r.readLong() }
-                }
-            }
-            p.notifyResponseHandlers(responses)
-            p.handleResult(responses.last())
-            found
-        } as List<Long>
+        val uids: List<Long> = if (query.all { it.code < 128 }) gmailRawSearch(folder, query) else standardSearch(folder, query)
         if (uids.isEmpty()) return ok("找不到符合「$query」的信。")
         val newest = uids.sortedDescending().take(max)
         val msgs = folder.getMessagesByUID(newest.toLongArray()).filterNotNull()
@@ -131,6 +122,35 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
             "[$uid] $date ${if (unread) "●" else "○"} $from｜${decode(m.subject)}\n    $snippet"
         }
         return ok("共 ${uids.size} 封，顯示最新 ${lines.size} 封：\n" + lines.joinToString("\n"))
+    }
+
+    /**
+     * Gmail search syntax through the X-GM-RAW extension. Gmail only accepts it as a *quoted*
+     * string; a literal ({n}\r\n...) makes it answer "BAD Could not parse command", and javax.mail
+     * turns any non-ASCII (or charset-tagged) string into a literal. So this path is ASCII-only.
+     */
+    private fun gmailRawSearch(folder: IMAPFolder, query: String): List<Long> {
+        @Suppress("UNCHECKED_CAST")
+        return folder.doCommand { p ->
+            val args = Argument().writeAtom("X-GM-RAW").writeString(query.replace("\"", ""))
+            val responses = p.command("UID SEARCH", args)
+            val found = mutableListOf<Long>()
+            for (r in responses) {
+                if (r is IMAPResponse && r.keyEquals("SEARCH")) {
+                    var n = r.readLong()
+                    while (n != -1L) { found += n; n = r.readLong() }
+                }
+            }
+            p.notifyResponseHandlers(responses)
+            p.handleResult(responses.last())
+            found
+        } as List<Long>
+    }
+
+    /** Non-ASCII keywords: plain IMAP SEARCH over subject / sender / body, which Gmail accepts as a UTF-8 literal. */
+    private fun standardSearch(folder: IMAPFolder, query: String): List<Long> {
+        val term = OrTerm(arrayOf(SubjectTerm(query), FromStringTerm(query), BodyTerm(query)))
+        return folder.search(term).map { folder.getUID(it) }
     }
 
     private fun read(folder: IMAPFolder, uid: Long): ToolResult {

@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -64,7 +65,10 @@ data class AppSettings(
     val longTermMemory: Boolean = true,             // fold old turns into a curated memory file; off = sliding window only
     val memoryModel: String = "claude-haiku-4-5",   // compaction is bookkeeping, not reasoning: use the cheap model
     val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
-    val wakeGreeting: Boolean = true,               // speak "何事需要驚動本座？" when summoned by long-press Home
+    val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
+    val ttsVoice: String = "",                      // Android TTS voice name; empty = engine default
+    val ttsPitch: Float = 1.0f,                     // 0.5 (deep) .. 2.0
+    val ttsRate: Float = 1.0f,                      // 0.5 .. 2.0
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
 }
@@ -105,6 +109,9 @@ class Settings(private val context: Context) {
             memoryModel = p[K.memoryModel] ?: "claude-haiku-4-5",
             memoryUseBatch = p[K.memoryUseBatch] ?: true,
             wakeGreeting = p[K.wakeGreeting] ?: true,
+            ttsVoice = p[K.ttsVoice] ?: "",
+            ttsPitch = p[K.ttsPitch] ?: 1.0f,
+            ttsRate = p[K.ttsRate] ?: 1.0f,
         )
     }
 
@@ -144,6 +151,9 @@ class Settings(private val context: Context) {
             p[K.memoryModel] = next.memoryModel
             p[K.memoryUseBatch] = next.memoryUseBatch
             p[K.wakeGreeting] = next.wakeGreeting
+            p[K.ttsVoice] = next.ttsVoice
+            p[K.ttsPitch] = next.ttsPitch
+            p[K.ttsRate] = next.ttsRate
         }
     }
 
@@ -183,5 +193,8 @@ class Settings(private val context: Context) {
         val memoryModel = stringPreferencesKey("memory_model")
         val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
+        val ttsVoice = stringPreferencesKey("tts_voice")
+        val ttsPitch = floatPreferencesKey("tts_pitch")
+        val ttsRate = floatPreferencesKey("tts_rate")
     }
 }
