@@ -18,6 +18,7 @@ import com.andychang.clauderi.llm.ChatProvider
 import com.andychang.clauderi.llm.ClaudeChatProvider
 import com.andychang.clauderi.llm.OpenAiChatProvider
 import com.andychang.clauderi.llm.Role
+import com.andychang.clauderi.llm.ToolExecutor
 import com.andychang.clauderi.stt.AndroidSpeechToText
 import com.andychang.clauderi.stt.OpenAiSpeechToText
 import kotlinx.coroutines.CoroutineScope
@@ -157,12 +158,17 @@ class AssistantEngine(
         store.append(Role.USER, userText, source)
         _state.value = AssistantState.Thinking(userText)
 
+        val toolErrors = mutableListOf<String>()
+        val base = capabilities.executor()
+        val executor = ToolExecutor { call ->
+            base.execute(call).also { r -> if (r.isError) toolErrors += "${call.name}: ${r.text}" }
+        }
         val reply = try {
             llm.reply(
                 systemPrompt = { buildSystemPrompt(settings.current()) },
                 history = store.recentTurns(cfg.historyTurns),
                 tools = { capabilities.tools(settings.current()) },
-                executor = capabilities.executor(),
+                executor = executor,
             )
         } catch (e: Exception) {
             Log.e(TAG, "llm failed", e)
@@ -170,7 +176,7 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed)
+        store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
 
         if (speakReply && reply.text.isNotBlank()) {
             _state.value = AssistantState.Speaking(reply.text)

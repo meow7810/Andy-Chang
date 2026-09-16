@@ -22,6 +22,7 @@ data class ChatMessage(
     val source: Source,
     val error: Boolean = false,
     val toolsUsed: List<String> = emptyList(),
+    val toolErrors: List<String> = emptyList(),   // raw tool failures, shown under the bubble so they can be debugged
 )
 
 /**
@@ -37,12 +38,13 @@ class ConversationStore(context: Context) {
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     suspend fun append(
-        role: Role, text: String, source: Source, error: Boolean = false, toolsUsed: List<String> = emptyList(),
+        role: Role, text: String, source: Source, error: Boolean = false,
+        toolsUsed: List<String> = emptyList(), toolErrors: List<String> = emptyList(),
     ): ChatMessage = mutex.withLock {
         val msg = ChatMessage(
             id = (_messages.value.lastOrNull()?.id ?: 0L) + 1,
             role = role, text = text, createdAt = System.currentTimeMillis(),
-            source = source, error = error, toolsUsed = toolsUsed,
+            source = source, error = error, toolsUsed = toolsUsed, toolErrors = toolErrors,
         )
         file.appendText(toJson(msg).toString() + "\n")
         _messages.value = _messages.value + msg
@@ -64,6 +66,7 @@ class ConversationStore(context: Context) {
             runCatching {
                 val o = JSONObject(line)
                 val tools = o.optJSONArray("tools")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
+                val terr = o.optJSONArray("terr")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
                 ChatMessage(
                     id = o.getLong("id"),
                     role = Role.valueOf(o.getString("role")),
@@ -72,6 +75,7 @@ class ConversationStore(context: Context) {
                     source = Source.valueOf(o.optString("src", "TEXT")),
                     error = o.optBoolean("err", false),
                     toolsUsed = tools,
+                    toolErrors = terr,
                 )
             }.getOrNull()
         }
@@ -80,5 +84,5 @@ class ConversationStore(context: Context) {
     private fun toJson(m: ChatMessage) = JSONObject()
         .put("id", m.id).put("role", m.role.name).put("text", m.text)
         .put("t", m.createdAt).put("src", m.source.name).put("err", m.error)
-        .put("tools", JSONArray(m.toolsUsed))
+        .put("tools", JSONArray(m.toolsUsed)).put("terr", JSONArray(m.toolErrors))
 }
