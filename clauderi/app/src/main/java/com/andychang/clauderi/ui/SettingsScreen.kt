@@ -113,6 +113,13 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             }
             Switch(checked = draft.autoSendTypedInput, onCheckedChange = { draft = draft.copy(autoSendTypedInput = it) })
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("長按 Home 召喚時直接開鍵盤")
+                Text("給 Typeless 這類語音鍵盤用：召喚後游標進輸入框、鍵盤彈出，對鍵盤講話。關閉則用上面選的辨識引擎錄音", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.assistOpensKeyboard, onCheckedChange = { draft = draft.copy(assistOpensKeyboard = it) })
+        }
 
         HorizontalDivider()
         Text("Gmail（開啟「Gmail 信箱」能力時使用）", style = MaterialTheme.typography.titleMedium)
@@ -170,6 +177,11 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 }
             }
         }
+        OutlinedTextField(
+            draft.maxReplyTokens.toString(),
+            { draft = draft.copy(maxReplyTokens = it.toIntOrNull()?.coerceIn(256, 8192) ?: draft.maxReplyTokens) },
+            label = { Text("回覆長度上限（token，2048 約 1200 中文字，最多 8192）") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("語音提問的回覆用語音朗讀")
             Switch(checked = draft.speakVoiceReplies, onCheckedChange = { draft = draft.copy(speakVoiceReplies = it) })

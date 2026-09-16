@@ -56,6 +56,8 @@ data class AppSettings(
     val speakVoiceReplies: Boolean = true,         // read the reply aloud when the question came in by voice
     val speakTextReplies: Boolean = false,
     val autoSendTypedInput: Boolean = false,       // dictation-keyboard mode: any typed input auto-sends after 2 s idle
+    val assistOpensKeyboard: Boolean = false,      // long-press Home focuses the text field (for Typeless-style dictation keyboards) instead of recording
+    val maxReplyTokens: Int = 2048,                // reply length cap (Claude): ~1200 Chinese chars
     val customInstructions: String = "",
     val enabledCapabilities: Set<CapabilityId> = emptySet(),
     val notificationApps: Set<String> = emptySet(), // package names allowed for capability NOTIFICATIONS
@@ -98,6 +100,8 @@ class Settings(private val context: Context) {
             speakVoiceReplies = p[K.speakVoice] ?: true,
             speakTextReplies = p[K.speakText] ?: false,
             autoSendTypedInput = p[K.autoSendTyped] ?: false,
+            assistOpensKeyboard = p[K.assistOpensKeyboard] ?: false,
+            maxReplyTokens = p[K.maxReplyTokens] ?: 2048,
             customInstructions = p[K.customInstructions] ?: "",
             enabledCapabilities = (p[K.capabilities] ?: emptySet())
                 .mapNotNull { runCatching { CapabilityId.valueOf(it) }.getOrNull() }.toSet(),
@@ -141,6 +145,8 @@ class Settings(private val context: Context) {
             p[K.speakVoice] = next.speakVoiceReplies
             p[K.speakText] = next.speakTextReplies
             p[K.autoSendTyped] = next.autoSendTypedInput
+            p[K.assistOpensKeyboard] = next.assistOpensKeyboard
+            p[K.maxReplyTokens] = next.maxReplyTokens
             p[K.customInstructions] = next.customInstructions
             p[K.capabilities] = next.enabledCapabilities.map { it.name }.toSet()
             p[K.notificationApps] = next.notificationApps
@@ -183,6 +189,8 @@ class Settings(private val context: Context) {
         val speakVoice = booleanPreferencesKey("speak_voice")
         val speakText = booleanPreferencesKey("speak_text")
         val autoSendTyped = booleanPreferencesKey("auto_send_typed")
+        val assistOpensKeyboard = booleanPreferencesKey("assist_opens_keyboard")
+        val maxReplyTokens = intPreferencesKey("max_reply_tokens")
         val customInstructions = stringPreferencesKey("custom_instructions")
         val capabilities = stringSetPreferencesKey("capabilities")
         val notificationApps = stringSetPreferencesKey("notification_apps")

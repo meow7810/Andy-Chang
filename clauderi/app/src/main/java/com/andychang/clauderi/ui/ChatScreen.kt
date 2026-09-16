@@ -36,7 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -64,6 +67,12 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
     var armed by remember { mutableStateOf(false) }      // auto-send countdown running
     var editTick by remember { mutableIntStateOf(0) }     // bumps on every edit to restart the countdown
     val listState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusRequests by app.assistant.focusInputRequests.collectAsState()
+    LaunchedEffect(focusRequests) {
+        if (focusRequests > 0) { focusRequester.requestFocus(); keyboard?.show(); if (cfg.autoSendTypedInput.not()) armed = false }
+    }
 
     fun sendNow() {
         if (input.isBlank()) return
@@ -127,7 +136,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                     if (v.isBlank()) armed = false
                     else if (armed || cfg.autoSendTypedInput) { armed = true; editTick++ }
                 },
-                modifier = Modifier.weight(1f), maxLines = 4,
+                modifier = Modifier.weight(1f).focusRequester(focusRequester), maxLines = 4,
                 placeholder = { Text("打字，或按麥克風說話…") },
             )
             IconButton(onClick = { sendNow() }) { Icon(Icons.Filled.Send, contentDescription = "送出") }

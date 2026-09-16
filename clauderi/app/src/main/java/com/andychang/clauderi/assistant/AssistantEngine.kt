@@ -86,6 +86,9 @@ class AssistantEngine(
     /** Set by MainActivity when it is opened via the assist gesture, so the UI starts listening. */
     val pendingAssistLaunch = MutableStateFlow(false)
 
+    /** Bumped when the UI should focus the text field and show the keyboard (dictation-keyboard summon). */
+    val focusInputRequests = MutableStateFlow(0)
+
     fun start() {
         // Keep the always-on services in sync with the user's switches.
         scope.launch {
@@ -115,6 +118,12 @@ class AssistantEngine(
         voiceJob = scope.launch {
             if (greet) {
                 val cfg = settings.current()
+                if (cfg.assistOpensKeyboard) {
+                    // The user dictates through their keyboard (e.g. Typeless): open it instead of recording.
+                    if (cfg.wakeGreeting && cfg.persona == Persona.LORD) { speaker.stop(); speaker.speak(Personas.WAKE_LINE) }
+                    focusInputRequests.value = focusInputRequests.value + 1
+                    return@launch
+                }
                 if (cfg.wakeGreeting && cfg.persona == Persona.LORD) {
                     speaker.stop()
                     _state.value = AssistantState.Speaking(Personas.WAKE_LINE)
@@ -246,7 +255,7 @@ class AssistantEngine(
         }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
-        LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel) }
+        LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel, cfg.maxReplyTokens.toLong()) }
         LlmBackend.OPENAI -> cfg.openAiKey.takeIf { it.isNotBlank() }?.let { OpenAiChatProvider(it, cfg.openAiChatModel) }
         LlmBackend.DEEPSEEK -> cfg.deepSeekKey.takeIf { it.isNotBlank() }?.let {
             OpenAiChatProvider(it, cfg.deepSeekModel, OpenAiChatProvider.DEEPSEEK_BASE_URL, id = "deepseek")
