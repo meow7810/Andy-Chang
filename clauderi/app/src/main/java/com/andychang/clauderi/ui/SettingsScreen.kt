@@ -131,6 +131,35 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             label = { Text("每次送給模型的歷史則數") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("長期記憶")
+                Text("超出上面則數的舊對話會在背景壓縮成「關於你的事」，永久保留；也可對它說「記住…」", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.longTermMemory, onCheckedChange = { draft = draft.copy(longTermMemory = it) })
+        }
+        if (draft.longTermMemory) {
+            val memoryText by app.memory.text.collectAsState()
+            var editing by remember { mutableStateOf(false) }
+            var memoryDraft by remember(memoryText) { mutableStateOf(memoryText) }
+            if (editing) {
+                OutlinedTextField(memoryDraft, { memoryDraft = it }, label = { Text("長期記憶（可直接編輯）") }, modifier = Modifier.fillMaxWidth(), minLines = 6)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { scope.launch { app.memory.replace(memoryDraft); editing = false } }) { Text("儲存記憶") }
+                    OutlinedButton(onClick = { editing = false }) { Text("取消") }
+                }
+            } else {
+                Text(
+                    memoryText.ifBlank { "（目前是空的）" },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { editing = true }) { Text("編輯記憶") }
+                    OutlinedButton(onClick = { scope.launch { app.memory.clear() } }) { Text("清除長期記憶") }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("語音提問的回覆用語音朗讀")
             Switch(checked = draft.speakVoiceReplies, onCheckedChange = { draft = draft.copy(speakVoiceReplies = it) })
         }

@@ -13,6 +13,7 @@
 - 聽寫鍵盤模式：用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出（你的鍵盤訂閱，不用 API）
 - 辨識結果先填進輸入框，2 秒沒動才送出；期間可修改或按「先不要送」
 - 對話記憶：`conversation.jsonl` 存手機本地，不設上限；送給模型的則數在設定頁調
+- 長期記憶：超出視窗的舊對話在背景壓成 `memory.json`（關於使用者的穩定事實，≤2000 字），每輪放進 system prompt；`remember` 工具可直接寫入；設定頁可看、可編輯、可清除、可關閉
 - 打字和語音共用同一份記憶；每個能力 = 一組 Claude 工具
 
 ## 專案結構（`clauderi/`）
@@ -22,6 +23,7 @@ app/src/main/java/com/andychang/clauderi/
   ClaudeRiApp.kt                     Application，把各層接起來
   data/Settings.kt                   API key、模型、記憶深度、能力開關、通知 App 允許清單（DataStore）
   data/ConversationStore.kt          對話記憶（JSON lines，永久保存）
+  data/MemoryStore.kt                長期記憶：背景壓縮舊對話 + remember 工具
   llm/ChatProvider.kt                ToolSpec / ToolCall / ChatProvider 介面
   llm/ClaudeChatProvider.kt          Claude + 手動 tool-use 迴圈（adaptive thinking、prompt cache）
   llm/OpenAiChatProvider.kt          OpenAI 相容端點 + function calling 迴圈

@@ -61,6 +61,7 @@ data class AppSettings(
     val readNotificationsAloud: Boolean = true,
     val allowAiCapabilityRequests: Boolean = true,  // model may ask (in chat) to enable a capability; user still confirms
     val persona: Persona = Persona.LORD,
+    val longTermMemory: Boolean = true,             // fold old turns into a curated memory file; off = sliding window only
     val wakeGreeting: Boolean = true,               // speak "何事需要驚動本座？" when summoned by long-press Home
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
@@ -98,6 +99,7 @@ class Settings(private val context: Context) {
             readNotificationsAloud = p[K.readNotificationsAloud] ?: true,
             allowAiCapabilityRequests = p[K.allowAiRequests] ?: true,
             persona = p[K.persona]?.let { runCatching { Persona.valueOf(it) }.getOrNull() } ?: Persona.LORD,
+            longTermMemory = p[K.longTermMemory] ?: true,
             wakeGreeting = p[K.wakeGreeting] ?: true,
         )
     }
@@ -134,6 +136,7 @@ class Settings(private val context: Context) {
             p[K.readNotificationsAloud] = next.readNotificationsAloud
             p[K.allowAiRequests] = next.allowAiCapabilityRequests
             p[K.persona] = next.persona.name
+            p[K.longTermMemory] = next.longTermMemory
             p[K.wakeGreeting] = next.wakeGreeting
         }
     }
@@ -170,6 +173,7 @@ class Settings(private val context: Context) {
         val readNotificationsAloud = booleanPreferencesKey("read_notifications_aloud")
         val allowAiRequests = booleanPreferencesKey("allow_ai_requests")
         val persona = stringPreferencesKey("persona")
+        val longTermMemory = booleanPreferencesKey("long_term_memory")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
     }
 }

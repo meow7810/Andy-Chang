@@ -11,6 +11,7 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.Personas
 import com.andychang.clauderi.data.Settings
@@ -62,6 +63,7 @@ class AssistantEngine(
     context: Context,
     private val settings: Settings,
     private val store: ConversationStore,
+    private val memory: MemoryStore,
     private val capabilities: CapabilityRegistry,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -189,6 +191,7 @@ class AssistantEngine(
             return@withLock
         }
         store.append(Role.ASSISTANT, reply.text, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
+        if (cfg.longTermMemory) scope.launch { memory.maybeCompact(llm, store.messages.value, cfg.historyTurns) }
 
         if (speakReply && reply.text.isNotBlank()) {
             _state.value = AssistantState.Speaking(reply.text)
@@ -211,6 +214,11 @@ class AssistantEngine(
                 append("\n\n使用者目前沒有授權任何手機能力給你，你只能純聊天；被要求操作手機時直說目前沒有授權。")
             }
             if (cfg.customInstructions.isNotBlank()) append("\n\n## 使用者的額外指示\n").append(cfg.customInstructions)
+            if (cfg.longTermMemory) {
+                val mem = memory.text.value
+                append("\n\n## 長期記憶（關於使用者，跨對話保留）\n")
+                append(mem.ifBlank { "（還沒有。使用者說「記住」或透露長期有用的事時，用 remember 工具寫入。）" })
+            }
             append("\n\n（現在時間：").append(now).append("）")
         }
     }

@@ -3,6 +3,7 @@ package com.andychang.clauderi.capabilities
 import android.content.Context
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
+import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.Settings
 import com.andychang.clauderi.llm.ToolCall
 import com.andychang.clauderi.llm.ToolExecutor
@@ -11,7 +12,12 @@ import com.andychang.clauderi.llm.ToolResult
 import com.andychang.clauderi.llm.ToolSpec
 
 /** Holds every capability and applies the user's per-capability switches. */
-class CapabilityRegistry(context: Context, private val settings: Settings, val broker: PermissionBroker) {
+class CapabilityRegistry(
+    context: Context,
+    private val settings: Settings,
+    val broker: PermissionBroker,
+    private val memory: MemoryStore,
+) {
 
     val all: List<Capability> = listOf(
         NotificationCapability(context),
@@ -34,6 +40,7 @@ class CapabilityRegistry(context: Context, private val settings: Settings, val b
         val list = enabled(cfg).flatMap { it.tools(cfg) }.toMutableList()
         val askable = CapabilityId.entries.filter { !cfg.has(it) }
         if (cfg.allowAiCapabilityRequests && askable.isNotEmpty()) list += requestTool(askable)
+        if (cfg.longTermMemory) list += REMEMBER_SPEC
         return list
     }
 
@@ -62,6 +69,13 @@ class CapabilityRegistry(context: Context, private val settings: Settings, val b
     fun executor() = ToolExecutor { call: ToolCall ->
         val cfg = settings.current()
         if (call.name == REQUEST_TOOL) return@ToolExecutor handleRequest(call, cfg)
+        if (call.name == REMEMBER_TOOL) {
+            if (!cfg.longTermMemory) return@ToolExecutor err("長期記憶已關閉。")
+            val note = call.str("note")?.trim().orEmpty()
+            if (note.isEmpty()) return@ToolExecutor err("缺少 note")
+            memory.appendNote(note)
+            return@ToolExecutor ok("已記住：$note")
+        }
         // Double check at execution time: a tool from a capability that is off is refused even if
         // the model somehow asked for it.
         val owner = enabled(cfg).firstOrNull { cap -> cap.tools(cfg).any { it.name == call.name } }
@@ -94,5 +108,14 @@ class CapabilityRegistry(context: Context, private val settings: Settings, val b
         }
     }
 
-    companion object { const val REQUEST_TOOL = "request_capability" }
+    companion object {
+        const val REQUEST_TOOL = "request_capability"
+        const val REMEMBER_TOOL = "remember"
+        private val REMEMBER_SPEC = ToolSpec(
+            REMEMBER_TOOL,
+            "把一件關於使用者的事寫進長期記憶（偏好、習慣、重要的人、進行中的計畫）。使用者明確說「記住」時一定要用；" +
+                "使用者主動透露長期有用的資訊時也可以用。不要記一次性的小事。",
+            listOf(ToolParam("note", "string", "一句話，具體、可日後引用")),
+        )
+    }
 }
