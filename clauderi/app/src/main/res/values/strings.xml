@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ClaudeRi</string>
+    <string name="screen_reader_description">讓 ClaudeRi 在你明確開啟「螢幕感知」能力時讀取目前畫面上的文字。這個服務只在你於 ClaudeRi 設定頁開啟該能力後才會回傳任何內容，且不會自動點擊或輸入。</string>
+</resources>

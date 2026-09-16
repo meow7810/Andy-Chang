@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares ClaudeRi as a digital assistant candidate ("Default digital assistant app" in Settings). -->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.andychang.clauderi.assistant.ClaudeRiSessionService"
+    android:recognitionService="com.andychang.clauderi.assistant.StubRecognitionService"
+    android:settingsActivity="com.andychang.clauderi.ui.MainActivity"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />
