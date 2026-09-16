@@ -24,7 +24,7 @@ class OpenAiSpeechToText(
     override val id = "openai"
 
     private companion object {
-        const val ZH_PROMPT = "以下是使用者對 AI 眼鏡助理說的話，台灣繁體中文口語，可能夾雜英文單字。"
+        const val ZH_EN_PROMPT = "使用者對 AI 眼鏡助理說話，台灣繁體中文或英文，常中英夾雜。The user speaks Taiwanese Mandarin or English, often mixed."
         const val GENERIC_PROMPT = "Short spoken commands and questions to a voice assistant."
     }
 
@@ -35,7 +35,7 @@ class OpenAiSpeechToText(
             .apply { languageHint?.let { addFormDataPart("language", it) } }
             // Biases the model toward Taiwanese Traditional Chinese and away from guessing a
             // random language when the first SCO frames are silence/noise.
-            .addFormDataPart("prompt", if (languageHint == "zh") ZH_PROMPT else GENERIC_PROMPT)
+            .addFormDataPart("prompt", if (languageHint == null || languageHint == "zh") ZH_EN_PROMPT else GENERIC_PROMPT)
             .addFormDataPart("file", "speech.wav", wav.toRequestBody("audio/wav".toMediaType()))
             .build()
         val req = Request.Builder()

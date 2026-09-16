@@ -33,7 +33,7 @@ data class AppSettings(
     val customPersonaPrompt: String = "",
     val historyTurns: Int = 40,
     val speakTextReplies: Boolean = false,
-    val languageHint: String = "zh",
+    val languageHint: String = "",   // empty = let the STT model auto-detect (zh / en mixed)
 ) {
     val systemPrompt: String
         get() = Personas.byName(personaName)?.prompt?.takeIf { personaName != Personas.CUSTOM_NAME }
@@ -63,7 +63,7 @@ class Settings(private val context: Context) {
             customPersonaPrompt = p[K.customPersona] ?: "",
             historyTurns = p[K.historyTurns] ?: 40,
             speakTextReplies = p[K.speakText] ?: false,
-            languageHint = p[K.language] ?: "zh",
+            languageHint = p[K.language] ?: "",
         )
     }
 

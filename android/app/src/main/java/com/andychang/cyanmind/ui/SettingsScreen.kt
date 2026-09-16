@@ -56,7 +56,7 @@ fun SettingsScreen(app: CyanApp, modifier: Modifier = Modifier) {
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
         OutlinedTextField(draft.typelessKey, { draft = draft.copy(typelessKey = it) }, label = { Text("Typeless API key（可選）") },
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(draft.languageHint, { draft = draft.copy(languageHint = it) }, label = { Text("語言提示（zh / en，留空自動）") },
+        OutlinedTextField(draft.languageHint, { draft = draft.copy(languageHint = it) }, label = { Text("語言提示（留空 = 自動偵測中英文；只講中文可填 zh）") },
             modifier = Modifier.fillMaxWidth(), singleLine = true)
 
         HorizontalDivider()
