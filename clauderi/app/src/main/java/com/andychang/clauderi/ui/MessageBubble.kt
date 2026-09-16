@@ -1,6 +1,9 @@
 package com.andychang.clauderi.ui
 
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,18 +17,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.Source
 import com.andychang.clauderi.llm.Role
 
+/** One message. Long-press copies the whole text to the clipboard (for pasting elsewhere). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun Bubble(m: ChatMessage) {
     val mine = m.role == Role.USER
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Box(
             Modifier
                 .widthIn(max = 300.dp)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = {
+                        clipboard.setText(AnnotatedString(m.text))
+                        Toast.makeText(context, "已複製", Toast.LENGTH_SHORT).show()
+                    },
+                )
                 .background(
                     when {
                         m.error -> Color(0xFF5A1F1F)
