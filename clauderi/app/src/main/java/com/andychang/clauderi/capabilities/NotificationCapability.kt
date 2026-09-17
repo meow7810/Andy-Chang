@@ -53,11 +53,13 @@ class ClaudeRiNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         NotificationStore.listener = this
+        ListeningWatcher.attach(this)   // media sessions ride on the same system grant
         runCatching { activeNotifications?.forEach { onNotificationPosted(it, quiet = true) } }
     }
 
     override fun onListenerDisconnected() {
         NotificationStore.listener = null
+        ListeningWatcher.detach()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) = onNotificationPosted(sbn, quiet = false)

@@ -5,6 +5,7 @@ import android.util.Log
 import com.andychang.clauderi.audio.MicRecorder
 import com.andychang.clauderi.audio.Speaker
 import com.andychang.clauderi.capabilities.CapabilityRegistry
+import com.andychang.clauderi.capabilities.ListeningWatcher
 import com.andychang.clauderi.capabilities.NotificationStore
 import com.andychang.clauderi.capabilities.ScreenReaderService
 import com.andychang.clauderi.data.AppSettings
@@ -103,6 +104,7 @@ class AssistantEngine(
                 speaker.rate = cfg.ttsRate
                 NotificationStore.enabled = cfg.has(CapabilityId.NOTIFICATIONS)
                 NotificationStore.allowedPackages = cfg.notificationApps
+                ListeningWatcher.enabled = cfg.has(CapabilityId.MUSIC) && cfg.listeningLog
                 ScreenReaderService.enabledInApp = cfg.has(CapabilityId.SCREEN)
             }
         }

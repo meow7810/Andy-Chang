@@ -100,7 +100,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 CapabilityId.CONTACTS -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS))
                                 CapabilityId.NOTIFICATIONS -> if (!(cap as NotificationCapability).listenerEnabled()) open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                 CapabilityId.SCREEN -> if (!(cap as ScreenCapability).serviceEnabled()) open(SysSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                CapabilityId.ACTIONS, CapabilityId.GMAIL, CapabilityId.CAMERA, CapabilityId.WEB -> Unit
+                                CapabilityId.ACTIONS, CapabilityId.MUSIC, CapabilityId.GMAIL, CapabilityId.CAMERA, CapabilityId.WEB -> Unit
                             }
                         })
                     }
@@ -129,6 +129,16 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                     else arrayOf(Manifest.permission.READ_CONTACTS),
                                 )
                             }) { Text("再次要求權限") }
+                        }
+                        CapabilityId.MUSIC -> if (on) {
+                            if (status.contains("尚未")) OutlinedButton(onClick = { open(SysSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }) { Text("系統通知存取設定") }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("聆聽紀錄")
+                                    Text("記下播過的歌、歌手、聽了多久，存在手機。從開啟那天起算，關掉就不記。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                                Switch(checked = cfg.listeningLog, onCheckedChange = { v -> scope.launch { app.settings.update { it.copy(listeningLog = v) } } })
+                            }
                         }
                         CapabilityId.ACTIONS, CapabilityId.CAMERA -> Unit
                         CapabilityId.WEB -> if (on && cfg.llm != com.andychang.clauderi.data.LlmBackend.CLAUDE) {

@@ -5,6 +5,7 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.HistorySearch
+import com.andychang.clauderi.data.ListeningLog
 import com.andychang.clauderi.data.MemoryGuard
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.Settings
@@ -20,6 +21,7 @@ class CapabilityRegistry(
     private val settings: Settings,
     val broker: PermissionBroker,
     private val memory: MemoryStore,
+    listeningLog: ListeningLog,
 ) {
 
     val all: List<Capability> = listOf(
@@ -27,6 +29,7 @@ class CapabilityRegistry(
         CalendarCapability(context),
         ContactsCapability(context),
         ActionsCapability(context),
+        MusicCapability(context, listeningLog),
         ScreenCapability(context),
         GmailCapability(context),
         CameraCapability(context),

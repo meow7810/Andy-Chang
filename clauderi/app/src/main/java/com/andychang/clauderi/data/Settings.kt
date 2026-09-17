@@ -28,7 +28,8 @@ enum class CapabilityId(val title: String, val summary: String) {
     NOTIFICATIONS("通知朗讀與回覆", "讀出、列出並回覆你勾選的 App 的通知"),
     CALENDAR("行事曆", "讀取接下來幾天的行程"),
     CONTACTS("聯絡人", "依姓名查電話"),
-    ACTIONS("動作：訊息、鬧鐘、計時器、音樂、導航", "透過系統 Intent 開啟對應 App，不會偷偷送出；音樂可搜尋播放與暫停切歌"),
+    ACTIONS("動作：訊息、鬧鐘、計時器、導航", "透過系統 Intent 開啟對應 App，不會偷偷送出"),
+    MUSIC("音樂", "搜尋播放、暫停切歌不需權限；循環、隨機、正在播什麼、聆聽紀錄需要系統通知存取"),
     SCREEN("螢幕感知（無障礙服務）", "讀取目前畫面上的文字。預設關閉，最後才建議打開"),
     GMAIL("Gmail 信箱", "用 Google 應用程式密碼透過 IMAP 搜尋、讀信、封存（可逆）、開退訂連結；不能刪信或寄信"),
     CAMERA("相機與照片", "開相機拍一張給模型看，並可把剛拍的照片分享到其他 App"),
@@ -70,6 +71,7 @@ data class AppSettings(
     val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
     val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
     val fictionMode: Boolean = false,               // everything said while on is tagged FICTION: never a fact about the user
+    val listeningLog: Boolean = false,              // MUSIC: record what was played (title, artist, time listened) to listening.jsonl
     val ttsVoice: String = "",                      // Android TTS voice name; empty = engine default
     val ttsPitch: Float = 1.0f,                     // 0.5 (deep) .. 2.0
     val ttsRate: Float = 1.0f,                      // 0.5 .. 2.0
@@ -116,6 +118,7 @@ class Settings(private val context: Context) {
             memoryUseBatch = p[K.memoryUseBatch] ?: true,
             wakeGreeting = p[K.wakeGreeting] ?: true,
             fictionMode = p[K.fictionMode] ?: false,
+            listeningLog = p[K.listeningLog] ?: false,
             ttsVoice = p[K.ttsVoice] ?: "",
             ttsPitch = p[K.ttsPitch] ?: 1.0f,
             ttsRate = p[K.ttsRate] ?: 1.0f,
@@ -161,6 +164,7 @@ class Settings(private val context: Context) {
             p[K.memoryUseBatch] = next.memoryUseBatch
             p[K.wakeGreeting] = next.wakeGreeting
             p[K.fictionMode] = next.fictionMode
+            p[K.listeningLog] = next.listeningLog
             p[K.ttsVoice] = next.ttsVoice
             p[K.ttsPitch] = next.ttsPitch
             p[K.ttsRate] = next.ttsRate
@@ -206,6 +210,7 @@ class Settings(private val context: Context) {
         val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
         val fictionMode = booleanPreferencesKey("fiction_mode")
+        val listeningLog = booleanPreferencesKey("listening_log")
         val ttsVoice = stringPreferencesKey("tts_voice")
         val ttsPitch = floatPreferencesKey("tts_pitch")
         val ttsRate = floatPreferencesKey("tts_rate")
