@@ -11,7 +11,6 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
-import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.StatementType
 import com.andychang.clauderi.data.ToolOutcome
