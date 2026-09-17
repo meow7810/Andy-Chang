@@ -72,7 +72,7 @@ internal fun CapabilityRequestCard(app: ClaudeRiApp) {
                     scope.launch {
                         app.settings.setCapability(req.capability, true)
                         when (req.capability) {
-                            CapabilityId.ACTIONS -> finish(true)
+                            CapabilityId.ACTIONS, CapabilityId.MUSIC -> finish(true)
                             CapabilityId.GMAIL -> finish(systemReady(app, req.capability, cfg))
                             CapabilityId.CAMERA, CapabilityId.WEB -> finish(true)
                             CapabilityId.CALENDAR -> permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
@@ -97,7 +97,7 @@ internal fun systemReady(app: ClaudeRiApp, cap: CapabilityId, cfg: AppSettings):
     CapabilityId.SCREEN -> (app.capabilities.byId(cap) as ScreenCapability).serviceEnabled()
     CapabilityId.CALENDAR -> (app.capabilities.byId(cap) as CalendarCapability).let { it.granted() && it.writeGranted() }
     CapabilityId.CONTACTS -> (app.capabilities.byId(cap) as ContactsCapability).granted()
-    CapabilityId.ACTIONS -> true
+    CapabilityId.ACTIONS, CapabilityId.MUSIC -> true
     CapabilityId.GMAIL -> (app.capabilities.byId(cap) as GmailCapability).configured(cfg)
     CapabilityId.CAMERA, CapabilityId.WEB -> true
 }

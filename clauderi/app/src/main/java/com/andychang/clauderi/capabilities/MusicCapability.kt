@@ -12,6 +12,9 @@ import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.support.v4.media.session.MediaControllerCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.view.KeyEvent
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
@@ -100,13 +103,14 @@ class MusicCapability(private val context: Context, private val log: ListeningLo
             return ok("已送出 $action。")
         }
         val session = activeSession(context) ?: return err(NO_SESSION)
-        val tc = session.transportControls
+        // Repeat / shuffle are not on the framework controller; the compat one wraps the same session.
+        val tc = MediaControllerCompat(context, MediaSessionCompat.Token.fromToken(session.sessionToken)).transportControls
         when (action) {
-            "repeat_one" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_ONE)
-            "repeat_all" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_ALL)
-            "repeat_off" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_NONE)
-            "shuffle_on" -> tc.setShuffleMode(PlaybackState.SHUFFLE_MODE_ALL)
-            "shuffle_off" -> tc.setShuffleMode(PlaybackState.SHUFFLE_MODE_NONE)
+            "repeat_one" -> tc.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_ONE)
+            "repeat_all" -> tc.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_ALL)
+            "repeat_off" -> tc.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_NONE)
+            "shuffle_on" -> tc.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL)
+            "shuffle_off" -> tc.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE)
             else -> return err("未知的 action")
         }
         return ok("已請 ${appLabel(context, session.packageName)} 設定 $action。不是每個 App 都接受這個指令，如果沒生效請告訴使用者要在 App 裡手動按。")

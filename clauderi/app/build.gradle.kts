@@ -58,4 +58,5 @@ dependencies {
     implementation(libs.android.mail)
     implementation(libs.android.activation)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.media)
 }
