@@ -166,6 +166,13 @@ class ConversationStore(context: Context) {
             .filter { it.role == Role.USER && !it.error && !it.deleted && it.statement == StatementType.USER_STATEMENT }
             .take(count).joinToString("\n") { it.text }
 
+    /** (first message time, live message count) for the prompt's "there is more history" hint; null when empty. */
+    fun archiveSpan(): Pair<Long, Int>? {
+        val live = _messages.value.filter { !it.deleted && !it.error }
+        val first = live.firstOrNull() ?: return null
+        return first.createdAt to live.size
+    }
+
     /** Last [turns] non-error messages, provider-neutral. Tombstoned messages are skipped. */
     fun recentTurns(turns: Int): List<ChatTurn> =
         window(turns).map { ChatTurn(it.role, it.text) }

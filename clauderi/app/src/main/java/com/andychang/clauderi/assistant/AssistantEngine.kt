@@ -196,7 +196,8 @@ class AssistantEngine(
 
         val toolErrors = mutableListOf<String>()
         val toolOutcomes = mutableListOf<ToolOutcome>()
-        val base = capabilities.executor(recentUserText = { store.recentUserText(6) })
+        // search_history sees everything but the question being asked right now, which would only match itself.
+        val base = capabilities.executor(recentUserText = { store.recentUserText(6) }, history = { store.messages.value.dropLast(1) })
         val executor = ToolExecutor { call ->
             base.execute(call).also { r ->
                 if (r.isError) toolErrors += "${call.name}: ${r.text}"
@@ -262,6 +263,10 @@ class AssistantEngine(
                 val mem = memory.text.value
                 append("## 長期記憶（關於使用者，跨對話保留）\n")
                 append(mem.ifBlank { "（還沒有。使用者說「記住」或透露長期有用的事時，用 remember 工具寫入。）" })
+                store.archiveSpan()?.let { (first, count) ->
+                    append("\n\n完整對話紀錄從 ").append(SimpleDateFormat("yyyy-MM-dd", Locale.TAIWAN).format(Date(first)))
+                    append(" 起共 ").append(count).append(" 則，只有最近幾則在你眼前；更早的原話用 search_history 查。")
+                }
                 append("\n\n")
             }
             append("（現在時間：").append(SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).format(Date())).append("）")
