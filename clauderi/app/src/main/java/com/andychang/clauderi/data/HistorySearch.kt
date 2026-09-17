@@ -45,8 +45,10 @@ object HistorySearch {
         if (q.isEmpty() && after == null && before == null) return emptySequence()
         val terms = q.split(Regex("\\s+")).filter { it.isNotBlank() }
         val bigrams = cjkBigrams(q)
-        val fromMs = after?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
-        val toMs = before?.plusDays(1)?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+        // A person's "day" runs past midnight: what happened "on the 16th" includes 1 a.m. on the 17th.
+        // So a day starts at 05:00 and the "before" day ends at 05:00 the next morning.
+        val fromMs = after?.atStartOfDay(zone)?.plusHours(5)?.toInstant()?.toEpochMilli()
+        val toMs = before?.plusDays(1)?.atStartOfDay(zone)?.plusHours(5)?.toInstant()?.toEpochMilli()
 
         return messages.asSequence()
             .filter { !it.deleted && !it.error && it.text.isNotBlank() }
