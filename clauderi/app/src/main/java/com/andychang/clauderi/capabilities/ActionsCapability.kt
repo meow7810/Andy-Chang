@@ -1,9 +1,14 @@
 package com.andychang.clauderi.capabilities
 
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
+import android.media.MediaMetadata
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
@@ -26,7 +31,7 @@ class ActionsCapability(private val context: Context) : Capability {
 
     override fun promptSection(settings: AppSettings) =
         "你可以執行動作：send_message（開啟簡訊 App 並填好收件人與內容，由使用者按送出）、" +
-            "set_alarm、set_timer、play_music（搜尋並播放，會開啟音樂 App）、control_media（暫停、繼續、下一首、上一首，作用在正在播的 App）、" +
+            "set_alarm、set_timer、play_music（搜尋並播放，會開啟音樂 App）、control_media（暫停、繼續、切歌、循環、隨機，作用在正在播的 App）、now_playing（現在播什麼）、" +
             "navigate_to（開啟 Google Maps 開始導航；「剛才那個地址」就用對話裡提過的地點）。" +
             "動作會直接執行，執行前如果資訊不完整先問清楚。"
 
@@ -51,9 +56,14 @@ class ActionsCapability(private val context: Context) : Capability {
             listOf(ToolParam("query", "string", "歌名、歌手、專輯或播放清單，越具體越準")),
         ),
         ToolSpec(
-            "control_media", "控制正在播放的音樂：暫停、繼續、下一首、上一首、停止。不用知道是哪個 App。",
-            listOf(ToolParam("action", "string", "要做的事", enum = listOf("pause", "play", "next", "previous", "stop"))),
+            "control_media",
+            "控制正在播放的音樂。pause/play/next/previous/stop 對任何 App 都有效；" +
+                "repeat_one（單曲循環）、repeat_all（全部循環）、repeat_off、shuffle_on、shuffle_off 需要使用者已授權「系統通知存取」（在通知能力頁完成），且看該 App 支不支援。",
+            listOf(ToolParam("action", "string", "要做的事", enum = listOf(
+                "pause", "play", "next", "previous", "stop", "repeat_one", "repeat_all", "repeat_off", "shuffle_on", "shuffle_off",
+            ))),
         ),
+        ToolSpec("now_playing", "查現在正在播什麼（歌名、歌手、哪個 App、播放中或暫停）。需要使用者已授權「系統通知存取」。"),
         ToolSpec(
             "navigate_to", "開啟地圖 App 並開始導航到指定地點。",
             listOf(
@@ -109,24 +119,69 @@ class ActionsCapability(private val context: Context) : Capability {
                     .putExtra(android.app.SearchManager.QUERY, q)
                 launch(i)?.let { err(it) } ?: ok("已請音樂 App 播放「$q」。")
             }
-            "control_media" -> {
-                val key = when (call.str("action")) {
-                    "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
-                    "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
-                    "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
-                    "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
-                    "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
-                    else -> return err("未知的 action")
-                }
-                // Same path as a headset button: the system routes it to whichever app holds the media session.
-                val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, key))
-                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, key))
-                ok("已送出 ${call.str("action")}。")
-            }
+            "control_media" -> controlMedia(call.str("action").orEmpty())
+            "now_playing" -> nowPlaying()
             else -> null
         }
     }
+
+    private fun controlMedia(action: String): ToolResult {
+        val key = when (action) {
+            "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+            "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+            "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+            else -> null
+        }
+        if (key != null) {
+            // Same path as a headset button: the system routes it to whichever app holds the media session.
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, key))
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, key))
+            return ok("已送出 $action。")
+        }
+        // Repeat / shuffle have no media key; they go through the app's MediaSession, which the
+        // system only exposes to apps holding notification-listener access.
+        val session = activeSession() ?: return err(NO_SESSION)
+        val tc = session.transportControls
+        when (action) {
+            "repeat_one" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_ONE)
+            "repeat_all" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_ALL)
+            "repeat_off" -> tc.setRepeatMode(PlaybackState.REPEAT_MODE_NONE)
+            "shuffle_on" -> tc.setShuffleMode(PlaybackState.SHUFFLE_MODE_ALL)
+            "shuffle_off" -> tc.setShuffleMode(PlaybackState.SHUFFLE_MODE_NONE)
+            else -> return err("未知的 action")
+        }
+        val app = appLabel(session.packageName)
+        return ok("已請 $app 設定 $action。不是每個 App 都接受這個指令，如果沒生效請告訴使用者要在 App 裡手動按。")
+    }
+
+    private fun nowPlaying(): ToolResult {
+        val session = activeSession() ?: return err(NO_SESSION)
+        val md = session.metadata
+        val title = md?.getString(MediaMetadata.METADATA_KEY_TITLE).orEmpty()
+        val artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST).orEmpty()
+        val album = md?.getString(MediaMetadata.METADATA_KEY_ALBUM).orEmpty()
+        val state = when (session.playbackState?.state) {
+            PlaybackState.STATE_PLAYING -> "播放中"
+            PlaybackState.STATE_PAUSED -> "暫停"
+            PlaybackState.STATE_STOPPED, PlaybackState.STATE_NONE, null -> "停止"
+            else -> "切換中"
+        }
+        if (title.isEmpty()) return ok("${appLabel(session.packageName)} 有媒體工作階段但沒有曲目資訊（$state）。")
+        return ok("${appLabel(session.packageName)}｜$state｜$title" + (if (artist.isNotEmpty()) "｜$artist" else "") + (if (album.isNotEmpty()) "｜$album" else ""))
+    }
+
+    /** The session the system would send a media key to (first = highest priority), or null. */
+    private fun activeSession(): MediaController? {
+        val listener = ComponentName(context, ClaudeRiNotificationListener::class.java)
+        val msm = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+        return try { msm.getActiveSessions(listener).firstOrNull() } catch (e: SecurityException) { null }
+    }
+
+    private fun appLabel(pkg: String): String =
+        runCatching { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
 
     private suspend fun resolveNumber(to: String, settings: AppSettings): String? {
         if (to.any { it.isDigit() } && to.all { it.isDigit() || it in "+-() " }) return to.filter { it.isDigit() || it == '+' }
@@ -144,5 +199,9 @@ class ActionsCapability(private val context: Context) : Capability {
         "手機上沒有可以處理這個動作的 App"
     }
 
-    override fun status() = "透過系統 Intent 執行，不需額外權限"
+    override fun status() = "透過系統 Intent 執行，不需額外權限；循環／隨機／正在播什麼需要「系統通知存取」（通知能力頁）"
+
+    private companion object {
+        const val NO_SESSION = "拿不到正在播放的媒體：可能沒有 App 在播，或使用者尚未授權「系統通知存取」（請他到通知能力頁按前往設定）。暫停與切歌不受影響。"
+    }
 }
