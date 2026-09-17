@@ -55,7 +55,7 @@
 - 可借的研究：TinyStyler（800M 風格改寫）、RoleLLM（LoRA 角色）、PersonaPKT（每個 persona 不到 0.1% 參數）、CharacterBot（Qwen2.5-7B + CharLoRA）、AuthorMix（作者風格 LoRA）、PD-LLM（人格特質模組化）、PALACE（memory bank + persona + LoRA）。它們問的是「怎麼更像指定 persona」，我們問的是「經過一年共同生活之後的歷史版本」，多一層。
 - 成本要把兩次呼叫一起算，拆層不保證更便宜。
 
-## 人格、風格、換腦：整理過的版本（2026-09-18，使用者的整理）
+## 人格、風格、換腦：整理過的版本（2026-09-18，Sol 的整理）
 - 先講清楚：風格層不是我們發明的。style transfer、persona fine-tuning、角色 adapter、「保留意思只改說法」外面都有完整脈絡。我們有形狀的地方只有一個：把這些放進一個長住的 agent 的身份遷移裡，而且嚴格限制風格層的權限。
 - 三個問題不能混成一個 persona：
   - Preference（他逐漸偏好什麼）：不是設定檔寫「喜歡重金屬」，是 經歷 → 回想 → 選擇 → 新經歷 慢慢養出來的路徑依賴。
