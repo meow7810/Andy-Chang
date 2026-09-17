@@ -10,7 +10,6 @@ import com.andychang.clauderi.llm.ToolCall
 import com.andychang.clauderi.llm.ToolParam
 import com.andychang.clauderi.llm.ToolResult
 import com.andychang.clauderi.llm.ToolSpec
-import com.sun.mail.iap.Argument
 import com.sun.mail.imap.IMAPFolder
 import com.sun.mail.imap.IMAPStore
 import com.sun.mail.imap.protocol.IMAPResponse
@@ -124,7 +123,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
 
     private fun search(folder: IMAPFolder, query: String, max: Int): ToolResult {
         if (query.isBlank()) return err("缺少 query")
-        val uids: List<Long> = if (query.all { it.code < 128 }) gmailRawSearch(folder, query) else standardSearch(folder, query)
+        val uids: List<Long> = runCatching { gmailRawSearch(folder, query) }.getOrElse { standardSearch(folder, query) }
         if (uids.isEmpty()) return ok("找不到符合「$query」的信。")
         val newest = uids.sortedDescending().take(max)
         val msgs = folder.getMessagesByUID(newest.toLongArray()).filterNotNull()
@@ -142,13 +141,17 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
     /**
      * Gmail search syntax through the X-GM-RAW extension. Gmail only accepts it as a *quoted*
      * string; a literal ({n}\r\n...) makes it answer "BAD Could not parse command", and javax.mail
-     * turns any non-ASCII (or charset-tagged) string into a literal. So this path is ASCII-only.
+     * turns any non-ASCII string argument into a literal. So the whole command is written as one
+     * string: Protocol.writeCommand emits the low byte of every char, so the UTF-8 bytes of the
+     * query are re-wrapped as ISO-8859-1 chars and reach the wire unchanged. Gmail reads the
+     * quoted string as UTF-8, which is what makes Chinese keywords work.
      */
     private fun gmailRawSearch(folder: IMAPFolder, query: String): List<Long> {
+        val quoted = "\"" + query.replace("\\", "").replace("\"", "") + "\""
+        val wire = String(quoted.toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1)
         @Suppress("UNCHECKED_CAST")
         return folder.doCommand { p ->
-            val args = Argument().writeAtom("X-GM-RAW").writeString(query.replace("\"", ""))
-            val responses = p.command("UID SEARCH", args)
+            val responses = p.command("UID SEARCH X-GM-RAW $wire", null)
             val found = mutableListOf<Long>()
             for (r in responses) {
                 if (r is IMAPResponse && r.keyEquals("SEARCH")) {
@@ -162,7 +165,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         } as List<Long>
     }
 
-    /** Non-ASCII keywords: plain IMAP SEARCH over subject / sender / body, which Gmail accepts as a UTF-8 literal. */
+    /** Fallback if the X-GM-RAW command is refused: plain IMAP SEARCH over subject / sender / body. */
     private fun standardSearch(folder: IMAPFolder, query: String): List<Long> {
         val term = OrTerm(arrayOf(SubjectTerm(query), FromStringTerm(query), BodyTerm(query)))
         return folder.search(term).map { folder.getUID(it) }
