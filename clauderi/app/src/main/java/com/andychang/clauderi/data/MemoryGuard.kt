@@ -33,6 +33,20 @@ object MemoryGuard {
     )
     private val explicitAsk = listOf("記住", "記得", "記下來", "記一下", "remember", "note this")
 
+    /** Lines a summariser must never keep, whatever it was fed: secrets and standing instructions. */
+    fun looksSecret(line: String): Boolean = secretLike.any { it.containsMatchIn(line.lowercase()) }
+    fun looksInstruction(line: String): Boolean = instructionLike.any { line.lowercase().contains(it) }
+
+    /**
+     * Compaction output goes through the same gate as `remember`, line by line. The summariser is
+     * a model reading a transcript that may contain test inputs, quoted mail, or the user saying
+     * "remember my password"; none of that becomes memory just because it was said.
+     */
+    fun scrubSummary(summary: String): String = summary.lines().filterNot { line ->
+        val body = line.trim().removePrefix("-").trim()
+        body.isNotEmpty() && (looksSecret(body) || looksInstruction(body) || body.contains("稱呼其為") || body.contains("叫他主人"))
+    }.joinToString("\n")
+
     fun check(note: String, memoryText: String, recentUserText: String): Verdict {
         val n = note.trim()
         if (n.isEmpty()) return Verdict.Reject("缺少 note")
