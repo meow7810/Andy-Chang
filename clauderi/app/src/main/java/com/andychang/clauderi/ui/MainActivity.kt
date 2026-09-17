@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import com.andychang.clauderi.ClaudeRiApp
+import com.andychang.clauderi.assistant.Announcer
 
 class MainActivity : ComponentActivity() {
 
@@ -58,6 +59,9 @@ class MainActivity : ComponentActivity() {
         }
         if (savedInstanceState == null) handleIntent(intent)   // not again on rotation / restore
     }
+
+    override fun onResume() { super.onResume(); Announcer.appVisible = true }
+    override fun onPause() { Announcer.appVisible = false; super.onPause() }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

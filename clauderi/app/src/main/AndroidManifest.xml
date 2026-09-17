@@ -12,6 +12,9 @@
     <!-- Capability 4: alarms / timers go through the clock app's Intent; SET_ALARM is a normal permission -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Capability 7 (camera), "看我拍的每一張": new gallery photos are shown to the model; asked only when that switch is on -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Lets us list installed apps for the per-app notification allow-list, and resolve the action intents -->
     <queries>

@@ -89,7 +89,7 @@ class MemoryStore(context: Context) {
             }
             // 2. Enough old material to be worth a call?
             val eligible = messages
-                .filter { !it.error && !it.deleted && it.statement != StatementType.FICTION && it.id > summarizedUpTo }
+                .filter { !it.error && !it.deleted && it.statement != StatementType.FICTION && it.statement != StatementType.EVENT && it.id > summarizedUpTo }
                 .dropLast(windowTurns)
             if (eligible.size < batch) return
             val chunk = eligible.take(batch * 3)

@@ -32,7 +32,7 @@ enum class CapabilityId(val title: String, val summary: String) {
     MUSIC("音樂", "搜尋播放、暫停切歌不需權限；循環、隨機、正在播什麼、聆聽紀錄需要系統通知存取"),
     SCREEN("螢幕感知（無障礙服務）", "讀取目前畫面上的文字。預設關閉，最後才建議打開"),
     GMAIL("Gmail 信箱", "用 Google 應用程式密碼透過 IMAP 搜尋、讀信、封存（可逆）、開退訂連結；不能刪信或寄信"),
-    CAMERA("相機與照片", "開相機拍一張給模型看，並可把剛拍的照片分享到其他 App"),
+    CAMERA("相機與照片", "開相機拍一張給模型看，並可把剛拍的照片分享到其他 App。另可讓牠在你拍照後自己決定要不要開口"),
     WEB("網路", "open_url 讀你給的網址（免費）；web_search 自己上網找（Claude 伺服器端，每次另計費）"),
 }
 
@@ -72,6 +72,8 @@ data class AppSettings(
     val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
     val fictionMode: Boolean = false,               // everything said while on is tagged FICTION: never a fact about the user
     val listeningLog: Boolean = false,              // MUSIC: record what was played (title, artist, time listened) to listening.jsonl
+    val photoDoor: Boolean = false,                 // CAMERA: a photo taken from the chat's camera button is shown to the model, which may speak first
+    val photoDoorGallery: Boolean = false,          // CAMERA: every new photo in the gallery does the same (needs READ_MEDIA_IMAGES)
     val ttsVoice: String = "",                      // Android TTS voice name; empty = engine default
     val ttsPitch: Float = 1.0f,                     // 0.5 (deep) .. 2.0
     val ttsRate: Float = 1.0f,                      // 0.5 .. 2.0
@@ -119,6 +121,8 @@ class Settings(private val context: Context) {
             wakeGreeting = p[K.wakeGreeting] ?: true,
             fictionMode = p[K.fictionMode] ?: false,
             listeningLog = p[K.listeningLog] ?: false,
+            photoDoor = p[K.photoDoor] ?: false,
+            photoDoorGallery = p[K.photoDoorGallery] ?: false,
             ttsVoice = p[K.ttsVoice] ?: "",
             ttsPitch = p[K.ttsPitch] ?: 1.0f,
             ttsRate = p[K.ttsRate] ?: 1.0f,
@@ -165,6 +169,8 @@ class Settings(private val context: Context) {
             p[K.wakeGreeting] = next.wakeGreeting
             p[K.fictionMode] = next.fictionMode
             p[K.listeningLog] = next.listeningLog
+            p[K.photoDoor] = next.photoDoor
+            p[K.photoDoorGallery] = next.photoDoorGallery
             p[K.ttsVoice] = next.ttsVoice
             p[K.ttsPitch] = next.ttsPitch
             p[K.ttsRate] = next.ttsRate
@@ -211,6 +217,8 @@ class Settings(private val context: Context) {
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
         val fictionMode = booleanPreferencesKey("fiction_mode")
         val listeningLog = booleanPreferencesKey("listening_log")
+        val photoDoor = booleanPreferencesKey("photo_door")
+        val photoDoorGallery = booleanPreferencesKey("photo_door_gallery")
         val ttsVoice = stringPreferencesKey("tts_voice")
         val ttsPitch = floatPreferencesKey("tts_pitch")
         val ttsRate = floatPreferencesKey("tts_rate")

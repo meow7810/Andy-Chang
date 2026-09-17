@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.FilledIconButton
@@ -44,6 +45,12 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.andychang.clauderi.capabilities.CameraCapability
+import com.andychang.clauderi.data.CapabilityId
+import java.io.File
 import com.andychang.clauderi.ClaudeRiApp
 import kotlinx.coroutines.launch
 import com.andychang.clauderi.assistant.AssistantState
@@ -142,6 +149,22 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f).focusRequester(focusRequester), maxLines = 4,
                 placeholder = { Text("打字，或按麥克風說話…") },
             )
+            if (cfg.has(CapabilityId.CAMERA) && cfg.photoDoor) {
+                // The door: take a picture, say nothing, let it decide whether to speak.
+                val doorFile = remember { mutableStateOf<File?>(null) }
+                val doorLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+                    val f = doorFile.value
+                    if (ok && f != null && f.exists() && f.length() > 0) {
+                        Thread { app.assistant.onPhoto(CameraCapability.downscale(f), "使用者按了相機鍵") }.start()
+                    }
+                }
+                IconButton(onClick = {
+                    val dir = File(context.cacheDir, "photos").apply { mkdirs() }
+                    val f = File(dir, "door_${System.currentTimeMillis()}.jpg")
+                    doorFile.value = f
+                    doorLauncher.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", f))
+                }) { Icon(Icons.Filled.PhotoCamera, contentDescription = "拍給牠看") }
+            }
             IconButton(onClick = { sendNow() }) { Icon(Icons.Filled.Send, contentDescription = "送出") }
             val busy = state is AssistantState.Listening || state is AssistantState.Transcribing || state is AssistantState.Speaking
             FilledIconButton(onClick = {

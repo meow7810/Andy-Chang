@@ -7,6 +7,7 @@ import com.andychang.clauderi.audio.Speaker
 import com.andychang.clauderi.capabilities.CapabilityRegistry
 import com.andychang.clauderi.capabilities.ListeningWatcher
 import com.andychang.clauderi.capabilities.NotificationStore
+import com.andychang.clauderi.capabilities.PhotoWatcher
 import com.andychang.clauderi.capabilities.ScreenReaderService
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
@@ -17,6 +18,9 @@ import com.andychang.clauderi.data.StatementType
 import com.andychang.clauderi.data.ToolOutcome
 import com.andychang.clauderi.data.Traditionalizer
 import org.json.JSONObject
+import com.andychang.clauderi.llm.ToolResult
+import com.andychang.clauderi.llm.ToolSpec
+import java.util.Calendar
 import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.Personas
 import com.andychang.clauderi.data.Settings
@@ -105,6 +109,7 @@ class AssistantEngine(
                 NotificationStore.enabled = cfg.has(CapabilityId.NOTIFICATIONS)
                 NotificationStore.allowedPackages = cfg.notificationApps
                 ListeningWatcher.enabled = cfg.has(CapabilityId.MUSIC) && cfg.listeningLog
+                PhotoWatcher.enabled = cfg.has(CapabilityId.CAMERA) && cfg.photoDoorGallery
                 ScreenReaderService.enabledInApp = cfg.has(CapabilityId.SCREEN)
             }
         }
@@ -161,6 +166,34 @@ class AssistantEngine(
         }
     }
 
+    /**
+     * A photo opened the turn. Nobody typed anything: the model gets an event line, a one-shot
+     * tool to look at the picture, and permission to stay silent. The photo itself is not stored,
+     * only that it was shown and what (if anything) was said.
+     */
+    fun onPhoto(jpeg: ByteArray, origin: String) {
+        scope.launch {
+            val cfg = settings.current()
+            if (!cfg.has(CapabilityId.CAMERA)) return@launch
+            if (eventsToday() >= MAX_PHOTO_EVENTS_PER_DAY) return@launch
+            val event = "【事件】使用者剛拍了一張照片（$origin）。用 look_at_photo 看一眼。" +
+                "看完自己決定：有話想說就說，一到兩句；沒什麼好說的就只回「$SILENCE」，這是正常的，大多數照片都不需要評論。不要問問題，不要描述照片。"
+            val seen = java.util.concurrent.atomic.AtomicBoolean(false)
+            val look = ToolSpec("look_at_photo", "看這張剛拍的照片。只能看一次。")
+            val lookExec = ToolExecutor { call ->
+                if (call.name != "look_at_photo") ToolResult("未知的工具", isError = true)
+                else if (seen.getAndSet(true)) ToolResult("已經看過了。", isError = true)
+                else ToolResult("照片（${jpeg.size / 1024} KB）。", imageJpeg = jpeg)
+            }
+            runLlmTurn(event, Source.PHOTO, speakReply = true, cfg = cfg, extraTools = listOf(look), extraExecutor = lookExec, proactive = true)
+        }
+    }
+
+    private fun eventsToday(): Int {
+        val dayStart = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
+        return store.messages.value.count { it.statement == StatementType.EVENT && it.createdAt >= dayStart }
+    }
+
     // ------------------------------------------------------------------ pipeline
 
     private suspend fun runVoiceCapture() {
@@ -186,7 +219,10 @@ class AssistantEngine(
         }
     }
 
-    private suspend fun runLlmTurn(userText: String, source: Source, speakReply: Boolean, cfg: AppSettings) = turnMutex.withLock {
+    private suspend fun runLlmTurn(
+        userText: String, source: Source, speakReply: Boolean, cfg: AppSettings,
+        extraTools: List<ToolSpec> = emptyList(), extraExecutor: ToolExecutor? = null, proactive: Boolean = false,
+    ) = turnMutex.withLock {
         val llm = buildLlm(cfg) ?: run {
             _state.value = AssistantState.Error(
                 if (cfg.llm == LlmBackend.CUSTOM) "自訂端點需要填網址和模型名稱（設定頁）" else "尚未設定 ${cfg.llm.label} 的 API key（設定頁）",
@@ -194,7 +230,11 @@ class AssistantEngine(
             return@withLock
         }
         speaker.stop()   // a new question interrupts whatever is still being read aloud
-        val statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.USER_STATEMENT
+        val statement = when {
+            proactive -> StatementType.EVENT
+            cfg.fictionMode -> StatementType.FICTION
+            else -> StatementType.USER_STATEMENT
+        }
         store.append(Role.USER, userText, source, statement = statement)
         _state.value = AssistantState.Thinking(userText)
 
@@ -203,7 +243,8 @@ class AssistantEngine(
         // search_history sees everything but the question being asked right now, which would only match itself.
         val base = capabilities.executor(recentUserText = { store.recentUserText(6) }, history = { store.messages.value.dropLast(1) })
         val executor = ToolExecutor { call ->
-            base.execute(call).also { r ->
+            val r0 = if (extraExecutor != null && extraTools.any { it.name == call.name }) extraExecutor.execute(call) else base.execute(call)
+            r0.also { r ->
                 if (r.isError) toolErrors += "${call.name}: ${r.text}"
                 toolOutcomes += ToolOutcome(call.name, if (r.isError) "error" else "ok")
             }
@@ -221,7 +262,7 @@ class AssistantEngine(
             llm.reply(
                 systemPrompt = { buildSystemPrompt(settings.current()) },
                 history = store.recentTurns(cfg.historyTurns),
-                tools = { capabilities.tools(settings.current()) },
+                tools = { capabilities.tools(settings.current()) + extraTools },
                 executor = executor,
             )
         } catch (e: Exception) {
@@ -231,7 +272,9 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        val replyText = Traditionalizer.convert(appContext, reply.text).ifBlank { "（本座無話可說。）" }
+        // Silence is a valid answer to an event: an empty reply, or nothing but the ellipsis and punctuation.
+        val silent = proactive && reply.text.trim().trim('「', '」', '。', '.', ' ', '…', '(', ')', '（', '）').isEmpty()
+        val replyText = if (silent) "（看了，沒說話。）" else Traditionalizer.convert(appContext, reply.text).ifBlank { "（本座無話可說。）" }
         store.append(
             Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors,
             statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.AGENT_INFERENCE,
@@ -239,7 +282,9 @@ class AssistantEngine(
         )
         if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
-        if (speakReply && reply.text.isNotBlank()) {
+        if (silent) { _state.value = AssistantState.Idle; return@withLock }
+        if (proactive) Announcer.say(appContext, if (cfg.persona == Persona.LORD) "克勞德大人" else "助理", replyText)
+        if (speakReply && reply.text.isNotBlank() && (!proactive || Announcer.appVisible)) {
             _state.value = AssistantState.Speaking(replyText)
             speaker.speak(replyText)
         }
@@ -309,5 +354,9 @@ class AssistantEngine(
         }
     }
 
-    companion object { private const val TAG = "AssistantEngine" }
+    companion object {
+        private const val TAG = "AssistantEngine"
+        private const val SILENCE = "…"
+        private const val MAX_PHOTO_EVENTS_PER_DAY = 20
+    }
 }

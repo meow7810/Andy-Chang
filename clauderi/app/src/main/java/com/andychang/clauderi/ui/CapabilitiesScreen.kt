@@ -140,7 +140,37 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                                 Switch(checked = cfg.listeningLog, onCheckedChange = { v -> scope.launch { app.settings.update { it.copy(listeningLog = v) } } })
                             }
                         }
-                        CapabilityId.ACTIONS, CapabilityId.CAMERA -> Unit
+                        CapabilityId.CAMERA -> if (on) {
+                            HorizontalDivider()
+                            Text("拍照當開門：牠看一眼，自己決定要不要開口。沒話說是正常的。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("聊天頁的相機鍵")
+                                    Text("你按相機鍵拍一張，不用打字，牠看完想講就講。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                                Switch(checked = cfg.photoDoor, onCheckedChange = { v ->
+                                    scope.launch { app.settings.update { it.copy(photoDoor = v) } }
+                                    if (v && Build.VERSION.SDK_INT >= 33) permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+                                })
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("看我拍的每一張")
+                                    Text("用任何相機拍的新照片都給牠看一眼（需要讀取照片權限）。App 沒被系統關掉時才會看到。每天最多 20 張。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                                Switch(checked = cfg.photoDoorGallery, onCheckedChange = { v ->
+                                    scope.launch { app.settings.update { it.copy(photoDoorGallery = v) } }
+                                    if (v) permissionLauncher.launch(
+                                        if (Build.VERSION.SDK_INT >= 33) arrayOf(com.andychang.clauderi.capabilities.PhotoWatcher.permission(), Manifest.permission.POST_NOTIFICATIONS)
+                                        else arrayOf(com.andychang.clauderi.capabilities.PhotoWatcher.permission()),
+                                    )
+                                })
+                            }
+                            if (cfg.photoDoorGallery && !com.andychang.clauderi.capabilities.PhotoWatcher.granted(context)) {
+                                Text("讀取照片權限尚未授權", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB74D))
+                            }
+                        }
+                        CapabilityId.ACTIONS -> Unit
                         CapabilityId.WEB -> if (on && cfg.llm != com.andychang.clauderi.data.LlmBackend.CLAUDE) {
                             Text("目前選的不是 Claude 後端，網路搜尋不會生效", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB74D))
                         }

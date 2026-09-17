@@ -17,14 +17,14 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.TimeZone
 
-enum class Source { VOICE, TEXT }
+enum class Source { VOICE, TEXT, PHOTO }   // PHOTO: a picture opened the turn, no words from the user
 
 /**
  * Who is speaking, in the sense that matters for memory. A novel pasted into the chat is not a
  * fact about the user; a line the assistant guessed is not something the user said. Facts and
  * summaries only ever draw on USER_STATEMENT.
  */
-enum class StatementType { USER_STATEMENT, AGENT_INFERENCE, EXTERNAL_REPORT, FICTION }
+enum class StatementType { USER_STATEMENT, AGENT_INFERENCE, EXTERNAL_REPORT, FICTION, EVENT }   // EVENT: something happened, nobody said it
 
 /** What a tool actually reported back, separate from what the assistant claimed it did. */
 data class ToolOutcome(val name: String, val observed: String)   // "ok" | "error" | "unknown"

@@ -47,6 +47,8 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/CalendarCapability.kt      list_calendar_events
   capabilities/ContactsCapability.kt      search_contacts
   capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / navigate_to（Intent）
+  capabilities/PhotoWatcher.kt            相簿新照片監看（「看我拍的每一張」）
+  assistant/Announcer.kt                  牠主動說話時的通知
   capabilities/MusicCapability.kt         play_music / control_media / now_playing / listening_history；ListeningWatcher 監看 MediaSession 寫聆聽紀錄
   data/ListeningLog.kt                    聆聽紀錄（JSON lines）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
@@ -73,6 +75,7 @@ app/src/main/java/com/andychang/clauderi/
 5. **音樂**：播放（搜尋後交給預設音樂 App）、暫停／切歌（媒體鍵，不需權限）、單曲／全部循環、隨機、查正在播什麼（走 MediaSession，需系統通知存取）。另有「聆聽紀錄」開關：記下播過的歌與聽了多久到 `listening.jsonl`，模型可查「這首我聽了幾次」；只從開啟那天起、且助理在場時算。
 6. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
 7. **相機與照片**：`take_photo` 開系統相機，照片縮到 1280px 後直接夾在工具結果裡給模型看（Claude 原生支援；OpenAI 相容端點改以下一則 user 訊息附圖）。`share_last_photo` 走系統分享面板，你選 App 和收件人。不需要相機權限，照片只在 App 快取。
+   **拍照當開門**（兩個子開關，預設關）：聊天頁多一個相機鍵，拍一張不用打字，模型看完自己決定要不要開口，沒話說就回「…」，紀錄留「（看了，沒說話。）」；「看我拍的每一張」則監看相簿新照片做同一件事（需讀取照片權限，每天上限 20 張）。照片本身不進紀錄，事件那則標成 EVENT，不進長期記憶也不當使用者陳述。App 不在前景時用通知說話。
 8. **網路**：`open_url` 由手機下載網頁、去 HTML 後給模型（免費，只算 token）；`web_search` 是 Claude 的伺服器端搜尋工具（`web_search_20260209`，台北地區設定，每次搜尋另計費），OpenAI 相容後端忽略。
 9. **Gmail 信箱**：IMAP + Google 應用程式密碼（不用 OAuth 專案、不會 7 天過期）。工具 `search_email`（Gmail 搜尋語法）、`read_email`、`archive_emails`（從收件匣封存，可逆，執行前模型必須先讓你確認）、`unsubscribe`（開該信的 List-Unsubscribe 連結）。讀信不會標成已讀；不能刪信、不能寄信。
 

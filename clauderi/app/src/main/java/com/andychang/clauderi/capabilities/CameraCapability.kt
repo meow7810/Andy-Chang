@@ -101,26 +101,28 @@ class CameraCapability(private val context: Context) : Capability {
         }
     }
 
-    /** Longest side <= 1280 px, JPEG q80, EXIF rotation applied. Keeps token cost low. */
-    private fun downscale(file: File): ByteArray {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1280 * 2) sample *= 2
-        val bmp = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return file.readBytes()
-        val scale = 1280f / maxOf(bmp.width, bmp.height)
-        val scaled = if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
-        val rotation = when (ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-        val upright = if (rotation != 0f) Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, Matrix().apply { postRotate(rotation) }, true) else scaled
-        val out = ByteArrayOutputStream()
-        upright.compress(Bitmap.CompressFormat.JPEG, 80, out)
-        return out.toByteArray()
-    }
-
     override fun status() = "使用系統相機 App，不需要相機權限；照片只存在 App 快取，分享時才離開手機"
+
+    companion object {
+        /** Longest side <= 1280 px, JPEG q80, EXIF rotation applied. Keeps token cost low. */
+        fun downscale(file: File): ByteArray {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.path, bounds)
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1280 * 2) sample *= 2
+            val bmp = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return file.readBytes()
+            val scale = 1280f / maxOf(bmp.width, bmp.height)
+            val scaled = if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
+            val rotation = when (ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+            val upright = if (rotation != 0f) Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, Matrix().apply { postRotate(rotation) }, true) else scaled
+            val out = ByteArrayOutputStream()
+            upright.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            return out.toByteArray()
+        }
+    }
 }

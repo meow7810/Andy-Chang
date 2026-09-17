@@ -5,6 +5,7 @@ import com.andychang.clauderi.assistant.AssistantEngine
 import com.andychang.clauderi.capabilities.CapabilityRegistry
 import com.andychang.clauderi.capabilities.ListeningWatcher
 import com.andychang.clauderi.capabilities.PermissionBroker
+import com.andychang.clauderi.capabilities.PhotoWatcher
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.ListeningLog
 import com.andychang.clauderi.data.MemoryStore
@@ -30,6 +31,8 @@ class ClaudeRiApp : Application() {
         capabilities = CapabilityRegistry(this, settings, PermissionBroker(), memory, listening)
         assistant = AssistantEngine(this, settings, conversation, memory, capabilities)
         assistant.start()
+        PhotoWatcher.onPhoto = { jpeg, origin -> assistant.onPhoto(jpeg, origin) }
+        PhotoWatcher.start(this)
         Thread { Traditionalizer.preload(this) }.start()   // ~1 MB of OpenCC tables, off the main thread
     }
 }
