@@ -55,6 +55,22 @@
 - 可借的研究：TinyStyler（800M 風格改寫）、RoleLLM（LoRA 角色）、PersonaPKT（每個 persona 不到 0.1% 參數）、CharacterBot（Qwen2.5-7B + CharLoRA）、AuthorMix（作者風格 LoRA）、PD-LLM（人格特質模組化）、PALACE（memory bank + persona + LoRA）。它們問的是「怎麼更像指定 persona」，我們問的是「經過一年共同生活之後的歷史版本」，多一層。
 - 成本要把兩次呼叫一起算，拆層不保證更便宜。
 
+## 人格、風格、換腦：整理過的版本（2026-09-18，使用者的整理）
+- 先講清楚：風格層不是我們發明的。style transfer、persona fine-tuning、角色 adapter、「保留意思只改說法」外面都有完整脈絡。我們有形狀的地方只有一個：把這些放進一個長住的 agent 的身份遷移裡，而且嚴格限制風格層的權限。
+- 三個問題不能混成一個 persona：
+  - Preference（他逐漸偏好什麼）：不是設定檔寫「喜歡重金屬」，是 經歷 → 回想 → 選擇 → 新經歷 慢慢養出來的路徑依賴。
+  - Personality（他通常怎麼判斷、怎麼互動）：會不會一味討好、什麼時候敢反對、什麼時候沉默、什麼時候吐槽。不是遣詞用字。
+  - Style / Voice（同一個意思他習慣怎麼說）：「我不同意」對「本王才不信你這奴才」。
+- 腦嘴分離真正有意思的是 authority boundary，不是 style adapter。腦交給嘴的 contract 是有約束力的結構：decision、facts、stance、uncertainty、tool_result、exact_quotes、speech_act、intensity、speak_or_silence。嘴是「語意權限有限的風格渲染器」，是安全邊界，不只是生成品質。
+- 換腦不是 hot swap，是 identity migration + rehabilitation：記憶可以搬家，習慣要重新長。能帶走的：raw history、episodic、semantic facts、preference trajectory、capability history、persona baseline、核准過的 style corpus。帶不走的：新腦對這些的理解、抑制力、幽默 timing、反對人的方式。換腦後有一段風格復健、關係復健，新習慣如果更好可以留下。連續性不是永遠不變，是「改變可以從自己的歷史解釋得通」。
+- 換腦經驗本身可以是可攜資產：migration_profile 記哪些 drift 最常出現、哪些情境最不像、哪些校正最有效、大概幾輪才穩。
+- 目前實驗只支持「記憶、判斷、聲音可能不是同一層」，不支持「穩定身份一定要貴腦」。Sonnet 是目前實驗上的 acceptance baseline，不是自然定律。要測的是 resident personality stability，不是 benchmark IQ。M2.5 修完再測。
+- Open weight 的價值是 stability sovereignty，不是便宜：商用 API 的風險是退休、行為改、moderation 改、推理堆疊更新、版本鎖不住。自己能固定版本，就能自己決定什麼時候換、怎麼測、怎麼復健。
+- 假設：personalization requires cognitive headroom。弱模型的問題不是不知道答案，是 persona 崩成 cosplay（每句都在演設定）。跨過門檻後，重點從「每年換更聰明的腦」變成「讓這一隻活得更久」，之後升級的是記憶、感官、工具、身體、技能。
+- Training provenance 和 memory provenance 是同一題：摘要不能因為壓縮就獲得原訊息沒有的 authority，訓練資料不能因為存進自己的 DB 就失去作者和授權來源。Provenance 是 future-use authority，不是裝飾。
+- 值得公開的貢獻不是單一算法，是同一個問題底下的五個方向：origin-bound memory authority、capability as autobiography、personality as trajectory、model-swap continuity、voice layer with bounded authority。
+- 一句話：Make the brain replaceable without making the relationship disposable. 記憶保存人生，模型詮釋人生，聲音表達現在的自己；換腦換的是腦，不該抹掉歷史。我們不是要證明換腦後完全不變，是研究換腦後怎麼讓改變仍有連續性。
+
 ## 訓練資料的來源（provenance 決定資料能做什麼）
 - 嘴的語料不吃任何模型輸出。Anthropic、OpenAI 的條款都限制拿輸出訓練競爭模型，「我擁有輸出」不等於「可以拿去訓練任何模型」，個人自用也不是自動豁免。
 - 只吃：使用者原創台詞、HappyArk 明確授權的角色文本、人類自己寫或核准的訓練句。人類挑選或小改過的模型輸出不能改標成人類原創。
