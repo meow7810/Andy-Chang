@@ -42,7 +42,7 @@ object HistorySearch {
         messages: List<ChatMessage>, query: String, after: LocalDate?, before: LocalDate?, zone: ZoneId,
     ): Sequence<Hit> {
         val q = query.trim().lowercase()
-        if (q.isEmpty()) return emptySequence()
+        if (q.isEmpty() && after == null && before == null) return emptySequence()
         val terms = q.split(Regex("\\s+")).filter { it.isNotBlank() }
         val bigrams = cjkBigrams(q)
         val fromMs = after?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
@@ -56,6 +56,8 @@ object HistorySearch {
                 val t = m.text.lowercase()
                 val termHits = terms.count { t.contains(it) }
                 val score = when {
+                    // No keyword, only a date range: everything in it, in time order (score by time, oldest first).
+                    q.isEmpty() -> 1.0 / (1.0 + m.createdAt / 1000.0)
                     t.contains(q) -> 2.0 + termHits
                     termHits > 0 -> termHits.toDouble()
                     bigrams.size >= 3 -> {
@@ -82,10 +84,12 @@ object HistorySearch {
             if (m.sha.isNotEmpty()) sb.append(" sha:").append(m.sha.take(8))
             sb.append("｜").append(fmt.format(Date(m.createdAt))).append("｜").append(speaker(m)).append("：")
             sb.append(clip(m.text)).append('\n')
-            // The other half of the exchange, so a quote is not read out of context.
-            val neighbour = if (m.role == Role.USER) byId[m.id + 1] else byId[m.id - 1]
-            if (neighbour != null && !neighbour.deleted && !neighbour.error && neighbour.text.isNotBlank()) {
-                sb.append("    ↳ ").append(speaker(neighbour)).append("：").append(clip(neighbour.text, 120)).append('\n')
+            // The exchange around it, so a quote is not read out of context and a correction one line
+            // later ("no, I meant X") is visible too.
+            for (d in listOf(-1, 1, 2)) {
+                val n = byId[m.id + d] ?: continue
+                if (n.deleted || n.error || n.text.isBlank()) continue
+                sb.append(if (d < 0) "    ↑ " else "    ↳ ").append(speaker(n)).append("：").append(clip(n.text, 120)).append('\n')
             }
         }
         return sb.toString().trimEnd()
