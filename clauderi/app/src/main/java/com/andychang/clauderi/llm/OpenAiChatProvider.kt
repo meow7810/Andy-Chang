@@ -107,20 +107,40 @@ class OpenAiChatProvider(
         }
     }
 
+    /**
+     * One request with the same retry policy the Claude SDK applies: overload and rate-limit
+     * answers (429, 500, 502, 503, 504) and connection failures are retried a few times with
+     * backoff; anything else (401, 404, 400) is reported at once.
+     */
     private fun post(payload: JSONObject): JSONObject {
-        val req = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/chat/completions")
-            .header("Authorization", "Bearer $apiKey")
-            .post(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-        client.newCall(req).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw LlmException("$id HTTP ${resp.code}: $text")
-            return JSONObject(text)
+        val body = payload.toString().toRequestBody("application/json".toMediaType())
+        var last: LlmException? = null
+        repeat(MAX_ATTEMPTS) { attempt ->
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/chat/completions")
+                .header("Authorization", "Bearer $apiKey")
+                .post(body)
+                .build()
+            try {
+                client.newCall(req).execute().use { resp ->
+                    val text = resp.body?.string().orEmpty()
+                    if (resp.isSuccessful) return JSONObject(text)
+                    val e = LlmException("$id HTTP ${resp.code}: ${text.take(600)}")
+                    if (resp.code !in RETRYABLE) throw e
+                    last = e
+                }
+            } catch (e: java.io.IOException) {
+                last = LlmException("$id 連線失敗：${e.message}", e)
+            }
+            if (attempt < MAX_ATTEMPTS - 1) Thread.sleep(BACKOFF_MS shl attempt)
         }
+        throw last ?: LlmException("$id 沒有回應")
     }
 
     companion object {
+        private const val MAX_ATTEMPTS = 4
+        private const val BACKOFF_MS = 1500L
+        private val RETRYABLE = setOf(429, 500, 502, 503, 504)
         const val DEFAULT_MODEL = "gpt-4o"
         const val OPENAI_BASE_URL = "https://api.openai.com/v1"
         const val DEEPSEEK_BASE_URL = "https://api.deepseek.com"
