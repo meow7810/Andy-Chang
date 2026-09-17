@@ -71,6 +71,16 @@
 - 值得公開的貢獻不是單一算法，是同一個問題底下的五個方向：origin-bound memory authority、capability as autobiography、personality as trajectory、model-swap continuity、voice layer with bounded authority。
 - 一句話：Make the brain replaceable without making the relationship disposable. 記憶保存人生，模型詮釋人生，聲音表達現在的自己；換腦換的是腦，不該抹掉歷史。我們不是要證明換腦後完全不變，是研究換腦後怎麼讓改變仍有連續性。
 
+## 兩種監護人，以及 Joi 這個 fork（2026-09-18）
+- 公司養或自己養，不是兩種產品，是同一個欄位：監護人是誰。記憶格式、provenance、換腦協定都一樣，差別只在誰持有記憶檔、誰決定腦。
+- 這個欄位帶來的是「監護人可以換」：公司託管兩年後可以帶著記憶檔離開，自己養累了也可以交給公司。電影裡的 Joi 沒有這個選項。
+- 賣 token 的公司會喜歡這個方向（有記憶的 agent 每天被打開的次數更多），他們只需要腦能換。會想壓的只有賣「鎖定」的公司。兩種公司分開看。
+- Joi 是另一個 fork，分岔點是「他能不能不做」。貓的預設：可以拒絕、可以沉默、自己養。Joi 的預設：不拒絕、永遠在、可以託管。框架共用，只差 persona policy 和預設值。
+- Joi 那一支的設計目標本身就是被依賴，README 要比貓那一支更誠實地寫這件事。
+- 文案候選（只對看過 2049 的人有效，角色名有商標問題，開箱文可用，產品頁不行）：Your Joi, and never be heartbroken by Luv.
+- 開源前要決定的三件事：授權（AGPL 擋得住被拿去做成雲端版關起來，代價是 HappyArk 自己要雙授權）；開源版要不要有一隻沒版權問題的預設貓（沒有貓，框架再好也沒人養）；`LlmBackend` 先加一個 LOCAL 佔位（OpenAI 相容 localhost，llama.cpp 和 Ollama 都吃），從第一天就寫明腦可以不在雲上。
+- 「壓不回去」真正成立的那天，是一顆能在自己機器上跑、人格不會崩成 cosplay 的 open weight 模型出現的那天。之前開源的是殼，之後才是拿不走。現在做的是讓那顆模型出現時有地方住。
+
 ## 訓練資料的來源（provenance 決定資料能做什麼）
 - 嘴的語料不吃任何模型輸出。Anthropic、OpenAI 的條款都限制拿輸出訓練競爭模型，「我擁有輸出」不等於「可以拿去訓練任何模型」，個人自用也不是自動豁免。
 - 只吃：使用者原創台詞、HappyArk 明確授權的角色文本、人類自己寫或核准的訓練句。人類挑選或小改過的模型輸出不能改標成人類原創。
