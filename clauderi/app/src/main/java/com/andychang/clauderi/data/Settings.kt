@@ -28,7 +28,7 @@ enum class CapabilityId(val title: String, val summary: String) {
     NOTIFICATIONS("通知朗讀與回覆", "讀出、列出並回覆你勾選的 App 的通知"),
     CALENDAR("行事曆", "讀取接下來幾天的行程"),
     CONTACTS("聯絡人", "依姓名查電話"),
-    ACTIONS("動作：訊息、鬧鐘、計時器、音樂", "透過系統 Intent 開啟對應 App，不會偷偷送出"),
+    ACTIONS("動作：訊息、鬧鐘、計時器、音樂、導航", "透過系統 Intent 開啟對應 App，不會偷偷送出；音樂可搜尋播放與暫停切歌"),
     SCREEN("螢幕感知（無障礙服務）", "讀取目前畫面上的文字。預設關閉，最後才建議打開"),
     GMAIL("Gmail 信箱", "用 Google 應用程式密碼透過 IMAP 搜尋、讀信、封存（可逆）、開退訂連結；不能刪信或寄信"),
     CAMERA("相機與照片", "開相機拍一張給模型看，並可把剛拍的照片分享到其他 App"),

@@ -46,7 +46,7 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/NotificationCapability.kt  通知監聽服務 + list/reply/dismiss 工具 + 新通知朗讀
   capabilities/CalendarCapability.kt      list_calendar_events
   capabilities/ContactsCapability.kt      search_contacts
-  capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / play_music（Intent）
+  capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / play_music / control_media / navigate_to（Intent、媒體鍵）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
   capabilities/GmailCapability.kt         IMAP（X-GM-RAW 搜尋）search_email / read_email
   capabilities/CameraCapability.kt        take_photo（照片進 tool_result）/ share_last_photo（分享面板）
@@ -67,7 +67,7 @@ app/src/main/java/com/andychang/clauderi/
 1. **預設助理**：`VoiceInteractionService` + `ACTION_ASSIST`。到「能力」頁按「前往系統設定」選 ClaudeRi。
 2. **通知朗讀與回覆**：開啟後到系統「通知存取權」授權，再逐 App 勾選允許哪些。工具：`list_notifications`、`reply_notification`（用通知本身的快速回覆）、`dismiss_notification`。
 3. **行事曆、聯絡人**：各自獨立開關，開啟時才要 `READ_CALENDAR` + `WRITE_CALENDAR` / `READ_CONTACTS`。行事曆可讀可新增（`add_calendar_event`）。
-4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂、導航（Google Maps），全走系統 Intent。
+4. **動作**：簡訊（開簡訊 App 填好、由你按送出）、鬧鐘、計時器、播放音樂（搜尋後交給預設音樂 App）、暫停／切歌（送媒體鍵給正在播的 App）、導航（Google Maps），全走系統 Intent。
 5. **螢幕感知**：無障礙服務，只讀文字不點擊；預設關閉，開啟後還要在系統無障礙設定啟用。
 7. **相機與照片**：`take_photo` 開系統相機，照片縮到 1280px 後直接夾在工具結果裡給模型看（Claude 原生支援；OpenAI 相容端點改以下一則 user 訊息附圖）。`share_last_photo` 走系統分享面板，你選 App 和收件人。不需要相機權限，照片只在 App 快取。
 8. **網路**：`open_url` 由手機下載網頁、去 HTML 後給模型（免費，只算 token）；`web_search` 是 Claude 的伺服器端搜尋工具（`web_search_20260209`，台北地區設定，每次搜尋另計費），OpenAI 相容後端忽略。

@@ -3,9 +3,11 @@ package com.andychang.clauderi.capabilities
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
+import android.view.KeyEvent
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.llm.ToolCall
@@ -24,7 +26,8 @@ class ActionsCapability(private val context: Context) : Capability {
 
     override fun promptSection(settings: AppSettings) =
         "你可以執行動作：send_message（開啟簡訊 App 並填好收件人與內容，由使用者按送出）、" +
-            "set_alarm、set_timer、play_music、navigate_to（開啟 Google Maps 開始導航；「剛才那個地址」就用對話裡提過的地點）。" +
+            "set_alarm、set_timer、play_music（搜尋並播放，會開啟音樂 App）、control_media（暫停、繼續、下一首、上一首，作用在正在播的 App）、" +
+            "navigate_to（開啟 Google Maps 開始導航；「剛才那個地址」就用對話裡提過的地點）。" +
             "動作會直接執行，執行前如果資訊不完整先問清楚。"
 
     override fun tools(settings: AppSettings) = listOf(
@@ -43,7 +46,14 @@ class ActionsCapability(private val context: Context) : Capability {
             "set_timer", "設定倒數計時器。",
             listOf(ToolParam("seconds", "integer", "總秒數"), ToolParam("label", "string", "標籤", required = false)),
         ),
-        ToolSpec("play_music", "用預設音樂 App 搜尋並播放。", listOf(ToolParam("query", "string", "歌名、歌手或播放清單"))),
+        ToolSpec(
+            "play_music", "用預設音樂 App（例如 YouTube Music）搜尋並播放。使用者只給氣氛或情境時，自己挑一首具體的歌名加歌手當 query。",
+            listOf(ToolParam("query", "string", "歌名、歌手、專輯或播放清單，越具體越準")),
+        ),
+        ToolSpec(
+            "control_media", "控制正在播放的音樂：暫停、繼續、下一首、上一首、停止。不用知道是哪個 App。",
+            listOf(ToolParam("action", "string", "要做的事", enum = listOf("pause", "play", "next", "previous", "stop"))),
+        ),
         ToolSpec(
             "navigate_to", "開啟地圖 App 並開始導航到指定地點。",
             listOf(
@@ -98,6 +108,21 @@ class ActionsCapability(private val context: Context) : Capability {
                     .putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
                     .putExtra(android.app.SearchManager.QUERY, q)
                 launch(i)?.let { err(it) } ?: ok("已請音樂 App 播放「$q」。")
+            }
+            "control_media" -> {
+                val key = when (call.str("action")) {
+                    "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+                    "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+                    "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+                    "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                    "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+                    else -> return err("未知的 action")
+                }
+                // Same path as a headset button: the system routes it to whichever app holds the media session.
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, key))
+                am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, key))
+                ok("已送出 ${call.str("action")}。")
             }
             else -> null
         }
