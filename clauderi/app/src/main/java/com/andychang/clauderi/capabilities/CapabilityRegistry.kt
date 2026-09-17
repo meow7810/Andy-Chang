@@ -173,8 +173,8 @@ class CapabilityRegistry(
             listOf(
                 ToolParam("query", "string", "關鍵字，可多個以空白分隔；中文短語可直接整句"),
                 ToolParam("limit", "integer", "最多幾則（預設 5，上限 20）", required = false),
-                ToolParam("after", "string", "只找這天之後，YYYY-MM-DD", required = false),
-                ToolParam("before", "string", "只找這天之前，YYYY-MM-DD", required = false),
+                ToolParam("after", "string", "只找這天（含）之後，YYYY-MM-DD", required = false),
+                ToolParam("before", "string", "只找這天（含）之前，YYYY-MM-DD。使用者說「X 號晚上」通常延續到隔天凌晨，before 要填隔天", required = false),
             ),
         )
         private val REMEMBER_SPEC = ToolSpec(
