@@ -86,11 +86,11 @@ internal fun Bubble(m: ChatMessage, onDelete: ((ChatMessage) -> Unit)? = null) {
     }
 }
 
-/** "【事件】使用者剛拍了一張照片（相簿新照片）。…" → "📷 拍了一張給牠看（相簿新照片）"; other events keep their first sentence. */
+/** "【事件】使用者剛拍了一張照片（相簿新照片）。…" → "📷 拍了一張給他看（相簿新照片）"; other events keep their first sentence. */
 private fun eventLabel(text: String): String {
     val origin = Regex("（([^）]*)）").find(text)?.groupValues?.get(1)
     return when {
-        text.contains("拍了一張照片") -> "📷 拍了一張給牠看" + (origin?.let { "（$it）" } ?: "")
+        text.contains("拍了一張照片") -> "📷 拍了一張給他看" + (origin?.let { "（$it）" } ?: "")
         else -> "⚡ " + text.removePrefix("【事件】").substringBefore("。")
     }
 }

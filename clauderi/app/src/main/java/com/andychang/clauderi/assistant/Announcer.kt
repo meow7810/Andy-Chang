@@ -32,7 +32,7 @@ object Announcer {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "助理主動說話", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "牠看到什麼、想說什麼的時候"
+                description = "他看到什麼、想說什麼的時候"
             })
         }
         val open = PendingIntent.getActivity(

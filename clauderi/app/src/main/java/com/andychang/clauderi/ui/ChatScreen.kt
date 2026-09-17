@@ -163,7 +163,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                     val f = File(dir, "door_${System.currentTimeMillis()}.jpg")
                     doorFile.value = f
                     doorLauncher.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", f))
-                }) { Icon(Icons.Filled.PhotoCamera, contentDescription = "拍給牠看") }
+                }) { Icon(Icons.Filled.PhotoCamera, contentDescription = "拍給他看") }
             }
             IconButton(onClick = { sendNow() }) { Icon(Icons.Filled.Send, contentDescription = "送出") }
             val busy = state is AssistantState.Listening || state is AssistantState.Transcribing || state is AssistantState.Speaking

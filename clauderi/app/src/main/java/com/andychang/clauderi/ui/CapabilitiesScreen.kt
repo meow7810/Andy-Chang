@@ -142,11 +142,11 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                         }
                         CapabilityId.CAMERA -> if (on) {
                             HorizontalDivider()
-                            Text("拍照當開門：牠看一眼，自己決定要不要開口。沒話說是正常的。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text("拍照當開門：他看一眼，自己決定要不要開口。沒話說是正常的。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("聊天頁的相機鍵")
-                                    Text("你按相機鍵拍一張，不用打字，牠看完想講就講。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text("你按相機鍵拍一張，不用打字，他看完想講就講。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                                 }
                                 Switch(checked = cfg.photoDoor, onCheckedChange = { v ->
                                     scope.launch { app.settings.update { it.copy(photoDoor = v) } }
@@ -156,7 +156,7 @@ fun CapabilitiesScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("看我拍的每一張")
-                                    Text("用任何相機拍的新照片都給牠看一眼（需要讀取照片權限）。App 沒被系統關掉時才會看到。每天最多 20 張。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text("用任何相機拍的新照片都給他看一眼（需要讀取照片權限）。App 沒被系統關掉時才會看到。每天最多 20 張。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                                 }
                                 Switch(checked = cfg.photoDoorGallery, onCheckedChange = { v ->
                                     scope.launch { app.settings.update { it.copy(photoDoorGallery = v) } }

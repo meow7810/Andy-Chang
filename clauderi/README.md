@@ -48,7 +48,7 @@ app/src/main/java/com/andychang/clauderi/
   capabilities/ContactsCapability.kt      search_contacts
   capabilities/ActionsCapability.kt       send_message / set_alarm / set_timer / navigate_to（Intent）
   capabilities/PhotoWatcher.kt            相簿新照片監看（「看我拍的每一張」）
-  assistant/Announcer.kt                  牠主動說話時的通知
+  assistant/Announcer.kt                  他主動說話時的通知
   capabilities/MusicCapability.kt         play_music / control_media / now_playing / listening_history；ListeningWatcher 監看 MediaSession 寫聆聽紀錄
   data/ListeningLog.kt                    聆聽紀錄（JSON lines）
   capabilities/ScreenCapability.kt        無障礙服務 read_screen（預設關）
