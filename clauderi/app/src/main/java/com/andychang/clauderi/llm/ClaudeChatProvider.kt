@@ -9,6 +9,7 @@ import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.CacheControlEphemeral
 import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.ContentBlockParam
+import com.anthropic.models.messages.Message
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.MessageParam
 import com.anthropic.models.messages.OutputConfig
@@ -52,6 +53,7 @@ class ClaudeChatProvider(
                 .build()
         }.toMutableList()
         val used = mutableListOf<String>()
+        var usage = Usage.ZERO
 
         repeat(MAX_TOOL_ROUNDS) {
             val specs = tools()
@@ -79,8 +81,9 @@ class ClaudeChatProvider(
             } catch (e: AnthropicServiceException) {
                 throw LlmException("Claude API error ${e.statusCode()}: ${e.message}", e)
             }
+            usage += usageOf(response)
             val stop = response.stopReason().orElse(null)
-            if (stop == StopReason.REFUSAL) return@withContext ChatReply("抱歉，這個問題我不方便回答。", used)
+            if (stop == StopReason.REFUSAL) return@withContext ChatReply("抱歉，這個問題我不方便回答。", used, usage)
 
             messages += response.toParam()
             val text = response.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim()
@@ -88,7 +91,7 @@ class ClaudeChatProvider(
 
             // Server-side tools (web search) can hand the turn back mid-way; just ask it to continue.
             if (stop == StopReason.PAUSE_TURN) return@repeat
-            if (stop != StopReason.TOOL_USE) return@withContext ChatReply(text, used)
+            if (stop != StopReason.TOOL_USE) return@withContext ChatReply(text, used, usage)
 
             val results = response.content().mapNotNull { it.toolUse().orElse(null) }.map { use ->
                 used += use.name()
@@ -133,7 +136,13 @@ class ClaudeChatProvider(
         val last = try { client.messages().create(closing) } catch (e: AnthropicServiceException) {
             throw LlmException("Claude API error ${e.statusCode()}: ${e.message}", e)
         }
-        ChatReply(last.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim(), used)
+        usage += usageOf(last)
+        ChatReply(last.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim(), used, usage)
+    }
+
+    private fun usageOf(m: Message): Usage {
+        val u = m.usage()
+        return Usage(u.inputTokens(), u.outputTokens(), u.cacheReadInputTokens().orElse(0L), u.cacheCreationInputTokens().orElse(0L))
     }
 
     /** Stable text first with the cache breakpoint; volatile text (memory, clock) after it, uncached. */

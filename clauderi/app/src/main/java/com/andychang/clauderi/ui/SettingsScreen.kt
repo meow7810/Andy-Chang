@@ -101,6 +101,14 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 Secret(draft.anthropicKey, "Anthropic API key") { draft = draft.copy(anthropicKey = it) }
                 Plain(draft.claudeModel, "Claude model（預設 claude-sonnet-5；想要最強改 claude-opus-5）") { draft = draft.copy(claudeModel = it) }
             }
+            LlmBackend.GEMINI -> {
+                Text(
+                    "AI Studio 的 API key。Google AI Pro 的每月 US\$10 開發者抵用額要先在 Developer Program 兌領並綁 Cloud 帳單帳戶，key 的專案掛在那個帳戶上才會扣到抵用額。",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+                Secret(draft.geminiKey, "Gemini API key") { draft = draft.copy(geminiKey = it) }
+                Plain(draft.geminiModel, "Gemini model（gemini-2.5-flash 便宜快；gemini-2.5-pro 較強）") { draft = draft.copy(geminiModel = it) }
+            }
             LlmBackend.OPENAI -> Plain(draft.openAiChatModel, "OpenAI chat model") { draft = draft.copy(openAiChatModel = it) }
             LlmBackend.DEEPSEEK -> {
                 Secret(draft.deepSeekKey, "DeepSeek API key") { draft = draft.copy(deepSeekKey = it) }
@@ -120,6 +128,33 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 Secret(draft.customKey, "API key") { draft = draft.copy(customKey = it) }
                 Plain(draft.customModel, "模型名稱（照供應商文件填）") { draft = draft.copy(customModel = it) }
             }
+        }
+
+        HorizontalDivider()
+        Text("貓糧", style = MaterialTheme.typography.titleMedium)
+        run {
+            val summary = remember(savedHint) { app.usage.monthSummary() }
+            val rate = draft.twdPerUsd
+            Text(
+                "本月估算：NT\$${"%.0f".format(summary.usd * rate)}（US\$${"%.2f".format(summary.usd)}），${summary.calls} 次呼叫" +
+                    (if (summary.unknownCalls > 0) "，其中 ${summary.unknownCalls} 次模型價格未知未計入" else ""),
+            )
+            if (summary.byPurpose.isNotEmpty()) {
+                Text(
+                    summary.byPurpose.entries.sortedByDescending { it.value }.joinToString("　") { (k, v) ->
+                        val label = when (k) { "chat" -> "對話"; "photo" -> "看照片"; "memory" -> "整理記憶"; "stt" -> "語音辨識"; else -> k }
+                        "$label NT\$${"%.0f".format(v * rate)}"
+                    },
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+            }
+            Text("這是 app 按供應商回報的 token 數和內建價目表估的，不是帳單。真正的金額以供應商的帳單為準。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            // Local text state so half-typed numbers ("32.") do not snap back while editing.
+            var capText by remember { mutableStateOf(if (draft.monthlyCapTwd == 0) "" else draft.monthlyCapTwd.toString()) }
+            var rateText by remember { mutableStateOf(draft.twdPerUsd.toString()) }
+            Plain(capText, "每月上限（NT\$，空白＝不設）") { v -> capText = v; draft = draft.copy(monthlyCapTwd = v.trim().toIntOrNull() ?: 0) }
+            Plain(rateText, "匯率（1 美元 = 幾元台幣，只影響顯示）") { v -> rateText = v; v.trim().toFloatOrNull()?.let { draft = draft.copy(twdPerUsd = it) } }
+            Text("到上限後不再發出任何付費呼叫：對話、看照片、整理記憶都停，重開 app 也一樣，直到你調高或下個月。已送出的呼叫不會追回。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
 
         HorizontalDivider()

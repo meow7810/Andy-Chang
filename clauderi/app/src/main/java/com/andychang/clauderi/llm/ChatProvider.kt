@@ -59,7 +59,16 @@ data class SystemPrompt(val stable: String, val volatile: String) {
     val full: String get() = if (volatile.isBlank()) stable else stable + "\n\n" + volatile
 }
 
-data class ChatReply(val text: String, val toolsUsed: List<String>)
+/**
+ * Token counts a provider reported for one reply (summed over tool rounds). [input] is the
+ * uncached prompt part; cache reads/writes are separate so they can be priced differently.
+ */
+data class Usage(val input: Long, val output: Long, val cacheRead: Long = 0, val cacheWrite: Long = 0) {
+    operator fun plus(o: Usage) = Usage(input + o.input, output + o.output, cacheRead + o.cacheRead, cacheWrite + o.cacheWrite)
+    companion object { val ZERO = Usage(0, 0) }
+}
+
+data class ChatReply(val text: String, val toolsUsed: List<String>, val usage: Usage? = null)
 
 /**
  * Pluggable LLM backend. The app owns memory (it decides how much history to send) and owns

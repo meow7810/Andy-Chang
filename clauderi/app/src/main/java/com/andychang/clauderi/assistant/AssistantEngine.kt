@@ -16,6 +16,7 @@ import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.StatementType
 import com.andychang.clauderi.data.ToolOutcome
+import com.andychang.clauderi.data.UsageLedger
 import com.andychang.clauderi.data.Traditionalizer
 import org.json.JSONObject
 import com.andychang.clauderi.llm.ToolResult
@@ -78,6 +79,7 @@ class AssistantEngine(
     private val store: ConversationStore,
     private val memory: MemoryStore,
     private val capabilities: CapabilityRegistry,
+    private val ledger: UsageLedger,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val appContext: Context = context.applicationContext
@@ -176,6 +178,7 @@ class AssistantEngine(
             val cfg = settings.current()
             if (!cfg.has(CapabilityId.CAMERA)) return@launch
             if (eventsToday() >= MAX_PHOTO_EVENTS_PER_DAY) return@launch
+            if (ledger.overCap(cfg)) { Log.i(TAG, "photo event skipped: monthly cap reached"); return@launch }
             val event = "【事件】使用者剛拍了一張照片（$origin）。用 look_at_photo 看一眼。" +
                 "看完自己決定：有話想說就說，一到兩句；沒什麼好說的就只回「$SILENCE」，這是正常的，大多數照片都不需要評論。不要問問題，不要描述照片。"
             val seen = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -209,6 +212,7 @@ class AssistantEngine(
                     if (rec.durationMs < 400) { _state.value = AssistantState.Idle; return }
                     _state.value = AssistantState.Transcribing
                     OpenAiSpeechToText(cfg.openAiKey, cfg.sttModel).transcribe(rec.wav, cfg.languageHint.ifBlank { null })
+                        .also { ledger.recordAudio("stt", "openai", cfg.sttModel, rec.durationMs / 1000.0) }
                 }
             }
             _state.value = AssistantState.Idle
@@ -227,6 +231,15 @@ class AssistantEngine(
             _state.value = AssistantState.Error(
                 if (cfg.llm == LlmBackend.CUSTOM) "自訂端點需要填網址和模型名稱（設定頁）" else "尚未設定 ${cfg.llm.label} 的 API key（設定頁）",
             )
+            return@withLock
+        }
+        if (ledger.overCap(cfg)) {
+            val msg = "本月貓糧上限（NT$${cfg.monthlyCapTwd}）已到，沒有呼叫模型。到設定頁調高上限或等下個月。"
+            if (!proactive) {
+                store.append(Role.USER, userText, source)
+                store.append(Role.ASSISTANT, "（$msg）", source, error = true)
+                _state.value = AssistantState.Error(msg)
+            }
             return@withLock
         }
         speaker.stop()   // a new question interrupts whatever is still being read aloud
@@ -272,6 +285,7 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
+        reply.usage?.let { ledger.record(if (proactive) "photo" else "chat", llm.id, modelName(cfg), it) }
         // Silence is a valid answer to an event: an empty reply, or nothing but the ellipsis and punctuation.
         val silent = proactive && reply.text.trim().trim('「', '」', '。', '.', ' ', '…', '(', ')', '（', '）').isEmpty()
         val replyText = if (silent) "（看了，沒說話。）" else Traditionalizer.convert(appContext, reply.text).ifBlank { "（本座無話可說。）" }
@@ -280,7 +294,7 @@ class AssistantEngine(
             statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.AGENT_INFERENCE,
             toolOutcomes = toolOutcomes, contextRef = contextRef,
         )
-        if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
+        if (cfg.longTermMemory && !ledger.overCap(cfg)) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
         if (silent) { _state.value = AssistantState.Idle; return@withLock }
         if (proactive) Announcer.say(appContext, if (cfg.persona == Persona.LORD) "克勞德大人" else "助理", replyText)
@@ -330,9 +344,10 @@ class AssistantEngine(
     /** Claude backend: cheap model + Batch. Anything else: the chat provider itself, synchronously. */
     private fun buildSummarizer(cfg: AppSettings, llm: ChatProvider): MemorySummarizer =
         if (cfg.llm == LlmBackend.CLAUDE && cfg.anthropicKey.isNotBlank()) {
-            ClaudeMemorySummarizer(cfg.anthropicKey, cfg.memoryModel.ifBlank { ClaudeMemorySummarizer.DEFAULT_MODEL }, cfg.memoryUseBatch)
+            val model = cfg.memoryModel.ifBlank { ClaudeMemorySummarizer.DEFAULT_MODEL }
+            ClaudeMemorySummarizer(cfg.anthropicKey, model, cfg.memoryUseBatch) { u, batch -> ledger.record("memory", "claude", model, u, batch) }
         } else {
-            DirectSummarizer(llm)
+            DirectSummarizer(llm) { u, _ -> ledger.record("memory", llm.id, modelName(cfg), u) }
         }
 
     private fun modelName(cfg: AppSettings): String = when (cfg.llm) {
@@ -340,12 +355,16 @@ class AssistantEngine(
         LlmBackend.OPENAI -> cfg.openAiChatModel
         LlmBackend.DEEPSEEK -> cfg.deepSeekModel
         LlmBackend.QWEN -> cfg.qwenModel
+        LlmBackend.GEMINI -> cfg.geminiModel
         LlmBackend.CUSTOM -> cfg.customModel
     }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel, cfg.maxReplyTokens.toLong()) }
         LlmBackend.OPENAI -> cfg.openAiKey.takeIf { it.isNotBlank() }?.let { OpenAiChatProvider(it, cfg.openAiChatModel) }
+        LlmBackend.GEMINI -> cfg.geminiKey.takeIf { it.isNotBlank() }?.let {
+            OpenAiChatProvider(it, cfg.geminiModel, OpenAiChatProvider.GEMINI_BASE_URL, id = "gemini")
+        }
         LlmBackend.DEEPSEEK -> cfg.deepSeekKey.takeIf { it.isNotBlank() }?.let {
             OpenAiChatProvider(it, cfg.deepSeekModel, OpenAiChatProvider.DEEPSEEK_BASE_URL, id = "deepseek")
         }

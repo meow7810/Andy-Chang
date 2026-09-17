@@ -18,7 +18,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 
 enum class Persona(val label: String) { LORD("克勞德大人"), PLAIN("一般助理") }
 enum class SttBackend(val label: String) { OPENAI("OpenAI gpt-4o-transcribe"), ANDROID("Android 內建（免費）") }
-enum class LlmBackend(val label: String) { CLAUDE("Claude"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen"), CUSTOM("自訂") }
+enum class LlmBackend(val label: String) { CLAUDE("Claude"), GEMINI("Gemini"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen"), CUSTOM("自訂") }
 
 /**
  * Every capability is an explicit opt-in. A capability that is off contributes no tools and no
@@ -41,6 +41,7 @@ data class AppSettings(
     val openAiKey: String = "",
     val deepSeekKey: String = "",
     val qwenKey: String = "",
+    val geminiKey: String = "",                    // AI Studio key; Google AI Pro's monthly developer credit lands on the key's Cloud project
     val customKey: String = "",
     val customBaseUrl: String = "",                // any OpenAI-compatible endpoint, e.g. Gemini / Groq / OpenRouter
     val customModel: String = "",
@@ -51,6 +52,7 @@ data class AppSettings(
     val openAiChatModel: String = "gpt-4o",
     val deepSeekModel: String = "deepseek-chat",
     val qwenModel: String = "qwen-plus",
+    val geminiModel: String = "gemini-2.5-flash",
     val stt: SttBackend = SttBackend.OPENAI,
     val sttModel: String = "gpt-4o-transcribe",
     val languageHint: String = "",                 // empty = auto-detect (zh / en mixed)
@@ -77,6 +79,8 @@ data class AppSettings(
     val ttsVoice: String = "",                      // Android TTS voice name; empty = engine default
     val ttsPitch: Float = 1.0f,                     // 0.5 (deep) .. 2.0
     val ttsRate: Float = 1.0f,                      // 0.5 .. 2.0
+    val monthlyCapTwd: Int = 0,                    // 貓糧 cap per calendar month in NT$; 0 = no cap. Reached → no new paid calls
+    val twdPerUsd: Float = 32f,                    // for showing the USD estimate in NT$
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
 }
@@ -99,6 +103,8 @@ class Settings(private val context: Context) {
             openAiChatModel = p[K.openAiChatModel] ?: "gpt-4o",
             deepSeekModel = p[K.deepSeekModel] ?: "deepseek-chat",
             qwenModel = p[K.qwenModel] ?: "qwen-plus",
+            geminiKey = p[K.geminiKey] ?: "",
+            geminiModel = p[K.geminiModel] ?: "gemini-2.5-flash",
             stt = p[K.stt]?.let { runCatching { SttBackend.valueOf(it) }.getOrNull() } ?: SttBackend.OPENAI,
             sttModel = p[K.sttModel] ?: "gpt-4o-transcribe",
             languageHint = p[K.language] ?: "",
@@ -126,6 +132,8 @@ class Settings(private val context: Context) {
             ttsVoice = p[K.ttsVoice] ?: "",
             ttsPitch = p[K.ttsPitch] ?: 1.0f,
             ttsRate = p[K.ttsRate] ?: 1.0f,
+            monthlyCapTwd = p[K.monthlyCapTwd] ?: 0,
+            twdPerUsd = p[K.twdPerUsd] ?: 32f,
         )
     }
 
@@ -148,6 +156,8 @@ class Settings(private val context: Context) {
             p[K.openAiChatModel] = next.openAiChatModel
             p[K.deepSeekModel] = next.deepSeekModel
             p[K.qwenModel] = next.qwenModel
+            p[K.geminiKey] = next.geminiKey
+            p[K.geminiModel] = next.geminiModel
             p[K.stt] = next.stt.name
             p[K.sttModel] = next.sttModel
             p[K.language] = next.languageHint
@@ -174,6 +184,8 @@ class Settings(private val context: Context) {
             p[K.ttsVoice] = next.ttsVoice
             p[K.ttsPitch] = next.ttsPitch
             p[K.ttsRate] = next.ttsRate
+            p[K.monthlyCapTwd] = next.monthlyCapTwd
+            p[K.twdPerUsd] = next.twdPerUsd
         }
     }
 
@@ -196,6 +208,8 @@ class Settings(private val context: Context) {
         val openAiChatModel = stringPreferencesKey("openai_chat_model")
         val deepSeekModel = stringPreferencesKey("deepseek_model")
         val qwenModel = stringPreferencesKey("qwen_model")
+        val geminiKey = stringPreferencesKey("gemini_key")
+        val geminiModel = stringPreferencesKey("gemini_model")
         val stt = stringPreferencesKey("stt")
         val sttModel = stringPreferencesKey("stt_model")
         val language = stringPreferencesKey("language")
@@ -222,5 +236,7 @@ class Settings(private val context: Context) {
         val ttsVoice = stringPreferencesKey("tts_voice")
         val ttsPitch = floatPreferencesKey("tts_pitch")
         val ttsRate = floatPreferencesKey("tts_rate")
+        val monthlyCapTwd = intPreferencesKey("monthly_cap_twd")
+        val twdPerUsd = floatPreferencesKey("twd_per_usd")
     }
 }

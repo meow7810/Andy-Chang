@@ -22,13 +22,13 @@ interface MemorySummarizer {
 }
 
 /** Any chat backend can summarise directly (no batch). */
-class DirectSummarizer(private val provider: ChatProvider) : MemorySummarizer {
+class DirectSummarizer(private val provider: ChatProvider, private val onUsage: (Usage, Boolean) -> Unit = { _, _ -> }) : MemorySummarizer {
     override suspend fun summarize(prompt: String): String = provider.reply(
         systemPrompt = { SystemPrompt(SYSTEM, "") },
         history = listOf(ChatTurn(Role.USER, prompt)),
         tools = { emptyList() },
         executor = ToolExecutor { ToolResult("no tools", isError = true) },
-    ).text
+    ).also { r -> r.usage?.let { onUsage(it, false) } }.text
 
     companion object { const val SYSTEM = "你是精確、簡潔的記憶整理員。" }
 }
@@ -41,6 +41,7 @@ class ClaudeMemorySummarizer(
     apiKey: String,
     private val model: String = DEFAULT_MODEL,
     private val useBatch: Boolean = true,
+    private val onUsage: (Usage, Boolean) -> Unit = { _, _ -> },   // (usage, wasBatch)
 ) : MemorySummarizer {
 
     private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
@@ -50,8 +51,12 @@ class ClaudeMemorySummarizer(
             com.anthropic.models.messages.MessageCreateParams.builder()
                 .model(model).maxTokens(2048L).system(DirectSummarizer.SYSTEM).addUserMessage(prompt).build(),
         )
+        onUsage(usageOf(resp.usage()), false)
         resp.content().mapNotNull { it.text().orElse(null)?.text() }.joinToString("").trim()
     }
+
+    private fun usageOf(u: com.anthropic.models.messages.Usage) =
+        Usage(u.inputTokens(), u.outputTokens(), u.cacheReadInputTokens().orElse(0L), u.cacheCreationInputTokens().orElse(0L))
 
     override suspend fun submit(prompt: String): String? {
         if (!useBatch) return null
@@ -77,6 +82,7 @@ class ClaudeMemorySummarizer(
                 ?: throw LlmException("batch $jobId ended without our result")
             val ok = item.result().succeeded().orElse(null)
                 ?: throw LlmException("batch $jobId request did not succeed")
+            onUsage(usageOf(ok.message().usage()), true)
             ok.message().content().mapNotNull { it.text().orElse(null)?.text() }.joinToString("").trim()
         }
     }
