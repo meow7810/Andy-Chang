@@ -52,7 +52,7 @@ data class AppSettings(
     val openAiChatModel: String = "gpt-4o",
     val deepSeekModel: String = "deepseek-chat",
     val qwenModel: String = "qwen-plus",
-    val geminiModel: String = "gemini-2.5-flash",
+    val geminiModel: String = "gemini-3.6-flash",
     val stt: SttBackend = SttBackend.OPENAI,
     val sttModel: String = "gpt-4o-transcribe",
     val languageHint: String = "",                 // empty = auto-detect (zh / en mixed)
@@ -104,7 +104,7 @@ class Settings(private val context: Context) {
             deepSeekModel = p[K.deepSeekModel] ?: "deepseek-chat",
             qwenModel = p[K.qwenModel] ?: "qwen-plus",
             geminiKey = p[K.geminiKey] ?: "",
-            geminiModel = p[K.geminiModel] ?: "gemini-2.5-flash",
+            geminiModel = p[K.geminiModel] ?: "gemini-3.6-flash",
             stt = p[K.stt]?.let { runCatching { SttBackend.valueOf(it) }.getOrNull() } ?: SttBackend.OPENAI,
             sttModel = p[K.sttModel] ?: "gpt-4o-transcribe",
             languageHint = p[K.language] ?: "",

@@ -107,7 +107,7 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall, color = Color.Gray,
                 )
                 Secret(draft.geminiKey, "Gemini API key") { draft = draft.copy(geminiKey = it) }
-                Plain(draft.geminiModel, "Gemini model（gemini-2.5-flash 便宜快；gemini-2.5-pro 較強）") { draft = draft.copy(geminiModel = it) }
+                Plain(draft.geminiModel, "Gemini model（gemini-3.6-flash 便宜快；gemini-3.6-pro 較強。Google 會下架舊模型，404 說哪個就改哪個）") { draft = draft.copy(geminiModel = it) }
             }
             LlmBackend.OPENAI -> Plain(draft.openAiChatModel, "OpenAI chat model") { draft = draft.copy(openAiChatModel = it) }
             LlmBackend.DEEPSEEK -> {
