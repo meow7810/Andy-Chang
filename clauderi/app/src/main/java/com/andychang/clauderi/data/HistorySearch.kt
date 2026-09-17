@@ -1,5 +1,6 @@
 package com.andychang.clauderi.data
 
+import com.andychang.clauderi.llm.Role
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.ZoneId
