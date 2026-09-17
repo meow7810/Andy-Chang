@@ -60,6 +60,10 @@ app/src/main/java/com/andychang/clauderi/
   ui/                                Compose：對話、能力、設定
 ```
 
+## 種子
+
+想過但還沒做的方向在 [IDEAS.md](IDEAS.md)。
+
 ## 在對話中授權
 
 模型看得到「有哪些能力可以請求」（只有名稱），但拿不到工具。需要時它呼叫 `request_capability`，
