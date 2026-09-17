@@ -65,9 +65,15 @@ internal fun Bubble(m: ChatMessage, onDelete: ((ChatMessage) -> Unit)? = null) {
                 if (onDelete != null && !m.deleted) DropdownMenuItem(text = { Text("刪除這則（留下墓碑）") }, onClick = { menu = false; onDelete(m) })
             }
             Column {
-                Text(if (m.deleted) "（已刪除）" else m.text, style = MaterialTheme.typography.bodyMedium, color = if (m.deleted) Color.Gray else Color.Unspecified)
+                val shown = when {
+                    m.deleted -> "（已刪除）"
+                    // An event line is the prompt that woke the model, not something the user typed: show what happened, not the wording.
+                    m.statement == com.andychang.clauderi.data.StatementType.EVENT -> eventLabel(m.text)
+                    else -> m.text
+                }
+                Text(shown, style = MaterialTheme.typography.bodyMedium, color = if (m.deleted || m.statement == com.andychang.clauderi.data.StatementType.EVENT) Color.Gray else Color.Unspecified)
                 val meta = buildString {
-                    append(if (m.source == Source.VOICE) "🎙 語音" else "⌨ 文字")
+                    append(when (m.source) { Source.VOICE -> "🎙 語音"; Source.PHOTO -> "📷 照片"; Source.TEXT -> "⌨ 文字" })
                     if (m.statement == com.andychang.clauderi.data.StatementType.FICTION) append("  📖 小說")
                     if (m.toolsUsed.isNotEmpty()) append("  🔧 ").append(m.toolsUsed.distinct().joinToString(", "))
                 }
@@ -77,5 +83,14 @@ internal fun Bubble(m: ChatMessage, onDelete: ((ChatMessage) -> Unit)? = null) {
                 }
             }
         }
+    }
+}
+
+/** "【事件】使用者剛拍了一張照片（相簿新照片）。…" → "📷 拍了一張給牠看（相簿新照片）"; other events keep their first sentence. */
+private fun eventLabel(text: String): String {
+    val origin = Regex("（([^）]*)）").find(text)?.groupValues?.get(1)
+    return when {
+        text.contains("拍了一張照片") -> "📷 拍了一張給牠看" + (origin?.let { "（$it）" } ?: "")
+        else -> "⚡ " + text.removePrefix("【事件】").substringBefore("。")
     }
 }
