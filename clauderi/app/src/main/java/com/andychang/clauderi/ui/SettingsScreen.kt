@@ -1,5 +1,7 @@
 package com.andychang.clauderi.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
@@ -50,6 +53,27 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
     LaunchedEffect(saved) { draft = saved }
     val scope = rememberCoroutineScope()
     var savedHint by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var archiveHint by remember { mutableStateOf("") }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching { context.contentResolver.openOutputStream(uri)!!.use { app.conversation.exportTo(it) } }
+                .onSuccess { archiveHint = "已匯出 ${app.conversation.messages.value.size} 則" }
+                .onFailure { archiveHint = "匯出失敗：${it.message}" }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching { context.contentResolver.openInputStream(uri)!!.use { app.conversation.importFrom(it) } }
+                .onSuccess { r ->
+                    archiveHint = "已還原 ${r.messages} 則、${r.tombstones} 個墓碑，格式 ${r.schema}，" +
+                        if (r.chainOk) "雜湊鏈完整" else "注意：雜湊鏈不完整（檔案可能被改過）"
+                }
+                .onFailure { archiveHint = "還原失敗：${it.message}" }
+        }
+    }
 
     @Composable
     fun Secret(value: String, label: String, onChange: (String) -> Unit) = OutlinedTextField(
@@ -183,6 +207,20 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 }
             }
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("小說模式")
+                Text("開著的時候，你和它說的話都標成「小說」：不會變成關於你的事實，也不會進長期記憶。貼故事、寫角色台詞時開。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.fictionMode, onCheckedChange = { draft = draft.copy(fictionMode = it) })
+        }
+        Text("對話檔案", style = MaterialTheme.typography.titleSmall)
+        Text("對話是唯一的原始紀錄，其他都是從它算出來的。匯出的檔案就是原始格式（JSON lines，含雜湊鏈），可以在另一支手機還原。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { exportLauncher.launch("lordclaude-conversation.jsonl") }) { Text("匯出對話") }
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("還原對話") }
+        }
+        if (archiveHint.isNotBlank()) Text(archiveHint, style = MaterialTheme.typography.bodySmall, color = Color(0xFF81C784))
         OutlinedTextField(
             draft.maxReplyTokens.toString(),
             { draft = draft.copy(maxReplyTokens = it.toIntOrNull()?.coerceIn(256, 8192) ?: draft.maxReplyTokens) },

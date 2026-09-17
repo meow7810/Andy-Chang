@@ -11,8 +11,23 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.TimeZone
 
 enum class Source { VOICE, TEXT }
+
+/**
+ * Who is speaking, in the sense that matters for memory. A novel pasted into the chat is not a
+ * fact about the user; a line the assistant guessed is not something the user said. Facts and
+ * summaries only ever draw on USER_STATEMENT.
+ */
+enum class StatementType { USER_STATEMENT, AGENT_INFERENCE, EXTERNAL_REPORT, FICTION }
+
+/** What a tool actually reported back, separate from what the assistant claimed it did. */
+data class ToolOutcome(val name: String, val observed: String)   // "ok" | "error" | "unknown"
 
 data class ChatMessage(
     val id: Long,
@@ -23,16 +38,33 @@ data class ChatMessage(
     val error: Boolean = false,
     val toolsUsed: List<String> = emptyList(),
     val toolErrors: List<String> = emptyList(),   // raw tool failures, shown under the bubble so they can be debugged
-)
+    val uid: String = "",                         // time-ordered, globally unique; survives merges across devices
+    val tz: String = "",                          // the user's zone at the time, e.g. Asia/Taipei
+    val statement: StatementType = if (role == Role.USER) StatementType.USER_STATEMENT else StatementType.AGENT_INFERENCE,
+    val toolOutcomes: List<ToolOutcome> = emptyList(),
+    val contextRef: String? = null,               // assistant only: JSON of what the model was actually shown this turn
+    val sha: String = "",                         // sha256 over (uid, role, createdAt, text); "" on legacy lines
+    val prev: String = "",                        // previous message's sha: the file is a hash chain
+    val deletedAt: Long? = null,                  // tombstone: text is gone, the slot remains
+) {
+    val deleted: Boolean get() = deletedAt != null
+}
+
+data class ImportReport(val messages: Int, val tombstones: Int, val chainOk: Boolean, val schema: String)
 
 /**
  * Append-only chat history stored as JSON lines in app-private storage. Nothing is ever
- * trimmed; [AppSettings.historyTurns] decides how much of it goes to the model each turn.
- * Voice and typed input share this one file.
+ * trimmed or edited in place; [AppSettings.historyTurns] decides how much of it goes to the
+ * model each turn. Voice and typed input share this one file.
+ *
+ * This file is the only truth. Long-term memory, summaries and anything else derived from it
+ * can be recomputed; this cannot. Hence: hash chain, stable ids, time zones, tombstones instead
+ * of deletes, and an export format that round-trips byte for byte.
  */
 class ConversationStore(context: Context) {
 
     private val file = File(context.filesDir, "conversation.jsonl")
+    private val backup = File(context.filesDir, "conversation.jsonl.bak")
     private val mutex = Mutex()
     private val _messages = MutableStateFlow(load())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -40,54 +72,194 @@ class ConversationStore(context: Context) {
     suspend fun append(
         role: Role, text: String, source: Source, error: Boolean = false,
         toolsUsed: List<String> = emptyList(), toolErrors: List<String> = emptyList(),
+        statement: StatementType = if (role == Role.USER) StatementType.USER_STATEMENT else StatementType.AGENT_INFERENCE,
+        toolOutcomes: List<ToolOutcome> = emptyList(),
+        contextRef: String? = null,
     ): ChatMessage = mutex.withLock {
+        val last = _messages.value.lastOrNull()
+        val now = System.currentTimeMillis()
+        val uid = newUid(now)
         val msg = ChatMessage(
-            id = (_messages.value.lastOrNull()?.id ?: 0L) + 1,
-            role = role, text = text, createdAt = System.currentTimeMillis(),
-            source = source, error = error, toolsUsed = toolsUsed, toolErrors = toolErrors,
+            id = (last?.id ?: 0L) + 1,
+            role = role, text = text, createdAt = now, source = source, error = error,
+            toolsUsed = toolsUsed, toolErrors = toolErrors,
+            uid = uid, tz = TimeZone.getDefault().id, statement = statement,
+            toolOutcomes = toolOutcomes, contextRef = contextRef,
+            sha = digest(uid, role, now, text), prev = last?.sha.orEmpty(),
         )
+        if (!file.exists()) file.appendText(HEADER + "\n")
         file.appendText(toJson(msg).toString() + "\n")
         _messages.value = _messages.value + msg
         msg
     }
 
+    /**
+     * The one exception to "never delete": the user asks for a message to go. The text is
+     * removed from the in-memory copy and a tombstone is appended; the original line stays in
+     * the file only until the next [compactTombstones], so the hash chain still verifies while
+     * the content itself is gone from what anyone reads.
+     */
+    suspend fun tombstone(id: Long) = mutex.withLock {
+        val idx = _messages.value.indexOfFirst { it.id == id }
+        if (idx < 0 || _messages.value[idx].deleted) return@withLock
+        val now = System.currentTimeMillis()
+        file.appendText(JSONObject().put("tomb", id).put("t", now).toString() + "\n")
+        rewrite(_messages.value.mapIndexed { i, m -> if (i == idx) m.copy(text = "", deletedAt = now) else m })
+    }
+
     suspend fun clear() = mutex.withLock {
         file.delete()
+        backup.delete()
         _messages.value = emptyList()
+    }
+
+    /** Copies the file out verbatim (header first if the file predates it). The export IS the format. */
+    suspend fun exportTo(out: OutputStream) = mutex.withLock {
+        out.bufferedWriter().use { w ->
+            if (!file.exists()) { w.write(HEADER); w.newLine(); return@use }
+            val lines = file.readLines()
+            if (lines.firstOrNull()?.contains("\"schema\"") != true) { w.write(HEADER); w.newLine() }
+            lines.forEach { w.write(it); w.newLine() }
+        }
+    }
+
+    /**
+     * Replaces the local history with an exported file after checking it parses and its hash
+     * chain holds. The previous file is kept as a .bak until the next import or clear.
+     */
+    suspend fun importFrom(input: InputStream): ImportReport = mutex.withLock {
+        val text = input.bufferedReader().readText()
+        val report = verify(text)
+        if (report.messages == 0 && report.tombstones == 0) return@withLock report
+        if (file.exists()) file.copyTo(backup, overwrite = true)
+        file.writeText(if (text.endsWith("\n")) text else text + "\n")
+        _messages.value = load()
+        report
+    }
+
+    /** Parses without touching disk: how many messages, whether the chain verifies. */
+    fun verify(text: String): ImportReport {
+        var schema = "(none)"
+        var msgs = 0; var tombs = 0; var chainOk = true; var prevSha = ""
+        text.lineSequence().filter { it.isNotBlank() }.forEach { line ->
+            val o = runCatching { JSONObject(line) }.getOrNull() ?: return@forEach
+            when {
+                o.has("schema") -> schema = o.getString("schema")
+                o.has("tomb") -> tombs++
+                o.has("id") -> {
+                    msgs++
+                    val m = fromJson(o) ?: return@forEach
+                    if (m.sha.isNotEmpty()) {
+                        if (m.prev != prevSha && prevSha.isNotEmpty()) chainOk = false
+                        if (!m.deleted && digest(m.uid, m.role, m.createdAt, m.text) != m.sha) chainOk = false
+                        prevSha = m.sha
+                    }
+                }
+            }
+        }
+        return ImportReport(msgs, tombs, chainOk, schema)
     }
 
     /** What the user said in their last [count] messages, joined; used to ground `remember` notes. */
     fun recentUserText(count: Int): String =
-        _messages.value.asReversed().asSequence().filter { it.role == Role.USER && !it.error }.take(count)
-            .joinToString("\n") { it.text }
+        _messages.value.asReversed().asSequence()
+            .filter { it.role == Role.USER && !it.error && !it.deleted && it.statement == StatementType.USER_STATEMENT }
+            .take(count).joinToString("\n") { it.text }
 
-    /** Last [turns] non-error messages, provider-neutral. */
+    /** Last [turns] non-error messages, provider-neutral. Tombstoned messages are skipped. */
     fun recentTurns(turns: Int): List<ChatTurn> =
-        _messages.value.filter { !it.error }.takeLast(turns).map { ChatTurn(it.role, it.text) }
+        window(turns).map { ChatTurn(it.role, it.text) }
+
+    /** The ids the model will see for [turns], so the assistant's reply can record what it was shown. */
+    fun windowIds(turns: Int): Pair<Long, Long>? =
+        window(turns).let { w -> if (w.isEmpty()) null else w.first().id to w.last().id }
+
+    private fun window(turns: Int) = _messages.value.filter { !it.error && !it.deleted }.takeLast(turns)
+
+    // ------------------------------------------------------------------ file format
 
     private fun load(): List<ChatMessage> {
         if (!file.exists()) return emptyList()
-        return file.readLines().mapNotNull { line ->
-            runCatching {
-                val o = JSONObject(line)
-                val tools = o.optJSONArray("tools")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
-                val terr = o.optJSONArray("terr")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
-                ChatMessage(
-                    id = o.getLong("id"),
-                    role = Role.valueOf(o.getString("role")),
-                    text = o.getString("text"),
-                    createdAt = o.getLong("t"),
-                    source = Source.valueOf(o.optString("src", "TEXT")),
-                    error = o.optBoolean("err", false),
-                    toolsUsed = tools,
-                    toolErrors = terr,
-                )
-            }.getOrNull()
+        val out = mutableListOf<ChatMessage>()
+        val tombs = mutableMapOf<Long, Long>()
+        file.readLines().forEach { line ->
+            val o = runCatching { JSONObject(line) }.getOrNull() ?: return@forEach
+            when {
+                o.has("tomb") -> tombs[o.getLong("tomb")] = o.optLong("t", 0L)
+                o.has("id") -> fromJson(o)?.let { out += it }
+            }
         }
+        if (tombs.isEmpty()) return out
+        return out.map { m -> tombs[m.id]?.let { t -> m.copy(text = "", deletedAt = t) } ?: m }
     }
 
+    /** Rewrites the file from memory. Only used after a tombstone, so the dead text leaves the disk too. */
+    private fun rewrite(msgs: List<ChatMessage>) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.bufferedWriter().use { w ->
+            w.write(HEADER); w.newLine()
+            msgs.forEach { w.write(toJson(it).toString()); w.newLine() }
+        }
+        tmp.renameTo(file)
+        _messages.value = msgs
+    }
+
+    private fun fromJson(o: JSONObject): ChatMessage? = runCatching {
+        val role = Role.valueOf(o.getString("role"))
+        val tools = o.optJSONArray("tools")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
+        val terr = o.optJSONArray("terr")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: emptyList()
+        val outcomes = o.optJSONArray("tobs")?.let { arr ->
+            List(arr.length()) { i -> arr.getJSONObject(i).let { ToolOutcome(it.getString("n"), it.getString("o")) } }
+        } ?: emptyList()
+        ChatMessage(
+            id = o.getLong("id"),
+            role = role,
+            text = o.getString("text"),
+            createdAt = o.getLong("t"),
+            source = Source.valueOf(o.optString("src", "TEXT")),
+            error = o.optBoolean("err", false),
+            toolsUsed = tools,
+            toolErrors = terr,
+            uid = o.optString("uid", ""),
+            tz = o.optString("tz", ""),
+            statement = o.optString("st", "").let { s -> StatementType.entries.firstOrNull { it.name == s } }
+                ?: if (role == Role.USER) StatementType.USER_STATEMENT else StatementType.AGENT_INFERENCE,
+            toolOutcomes = outcomes,
+            contextRef = o.optString("ctx", "").ifBlank { null },
+            sha = o.optString("sha", ""),
+            prev = o.optString("prev", ""),
+            deletedAt = if (o.has("del")) o.getLong("del") else null,
+        )
+    }.getOrNull()
+
     private fun toJson(m: ChatMessage) = JSONObject()
-        .put("id", m.id).put("role", m.role.name).put("text", m.text)
-        .put("t", m.createdAt).put("src", m.source.name).put("err", m.error)
+        .put("id", m.id).put("uid", m.uid).put("role", m.role.name).put("text", m.text)
+        .put("t", m.createdAt).put("tz", m.tz).put("src", m.source.name).put("err", m.error)
+        .put("st", m.statement.name)
         .put("tools", JSONArray(m.toolsUsed)).put("terr", JSONArray(m.toolErrors))
+        .put("tobs", JSONArray(m.toolOutcomes.map { JSONObject().put("n", it.name).put("o", it.observed) }))
+        .put("sha", m.sha).put("prev", m.prev)
+        .also { o ->
+            m.contextRef?.let { o.put("ctx", it) }
+            m.deletedAt?.let { o.put("del", it) }
+        }
+
+    companion object {
+        /** Bump when a field changes meaning. Readers must tolerate unknown fields and missing new ones. */
+        const val SCHEMA = "lordclaude-conversation/1"
+        private val HEADER = JSONObject().put("schema", SCHEMA).toString()
+        private val rng = SecureRandom()
+
+        /** 12 hex digits of millis (sorts by time) + 20 random hex digits. */
+        fun newUid(now: Long): String {
+            val b = ByteArray(10); rng.nextBytes(b)
+            return "%012x".format(now) + b.joinToString("") { "%02x".format(it) }
+        }
+
+        fun digest(uid: String, role: Role, createdAt: Long, text: String): String =
+            sha256("$uid|${role.name}|$createdAt|$text")
+
+        fun sha256(s: String): String =
+            MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    }
 }

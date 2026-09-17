@@ -11,7 +11,11 @@ import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.LlmBackend
+import com.andychang.clauderi.data.ConversationStore
 import com.andychang.clauderi.data.MemoryStore
+import com.andychang.clauderi.data.StatementType
+import com.andychang.clauderi.data.ToolOutcome
+import org.json.JSONObject
 import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.Personas
 import com.andychang.clauderi.data.Settings
@@ -187,14 +191,28 @@ class AssistantEngine(
             return@withLock
         }
         speaker.stop()   // a new question interrupts whatever is still being read aloud
-        store.append(Role.USER, userText, source)
+        val statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.USER_STATEMENT
+        store.append(Role.USER, userText, source, statement = statement)
         _state.value = AssistantState.Thinking(userText)
 
         val toolErrors = mutableListOf<String>()
+        val toolOutcomes = mutableListOf<ToolOutcome>()
         val base = capabilities.executor(recentUserText = { store.recentUserText(6) })
         val executor = ToolExecutor { call ->
-            base.execute(call).also { r -> if (r.isError) toolErrors += "${call.name}: ${r.text}" }
+            base.execute(call).also { r ->
+                if (r.isError) toolErrors += "${call.name}: ${r.text}"
+                toolOutcomes += ToolOutcome(call.name, if (r.isError) "error" else "ok")
+            }
         }
+        // What the model is about to be shown: the history window, the memory text, the model.
+        // Recorded on the reply so "why did it say that" can be answered later.
+        val contextRef = JSONObject().apply {
+            store.windowIds(cfg.historyTurns)?.let { (a, b) -> put("from", a).put("to", b) }
+            put("turns", cfg.historyTurns)
+            if (cfg.longTermMemory) put("memSha", ConversationStore.sha256(memory.text.value).take(16))
+            put("model", llm.id + ":" + modelName(cfg))
+            put("persona", cfg.persona.name)
+        }.toString()
         val reply = try {
             llm.reply(
                 systemPrompt = { buildSystemPrompt(settings.current()) },
@@ -204,12 +222,17 @@ class AssistantEngine(
             )
         } catch (e: Exception) {
             Log.e(TAG, "llm failed", e)
-            store.append(Role.ASSISTANT, "（回覆失敗：${e.message}）", source, error = true)
+            store.append(Role.ASSISTANT, "（回覆失敗：${e.message}）", source, error = true, contextRef = contextRef,
+                toolOutcomes = toolOutcomes + ToolOutcome("turn", "unknown"))
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
         val replyText = reply.text.ifBlank { "（本座無話可說。）" }
-        store.append(Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors)
+        store.append(
+            Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors,
+            statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.AGENT_INFERENCE,
+            toolOutcomes = toolOutcomes, contextRef = contextRef,
+        )
         if (cfg.longTermMemory) scope.launch { memory.maybeCompact(buildSummarizer(cfg, llm), store.messages.value, cfg.historyTurns) }
 
         if (speakReply && reply.text.isNotBlank()) {
@@ -254,6 +277,14 @@ class AssistantEngine(
         } else {
             DirectSummarizer(llm)
         }
+
+    private fun modelName(cfg: AppSettings): String = when (cfg.llm) {
+        LlmBackend.CLAUDE -> cfg.claudeModel
+        LlmBackend.OPENAI -> cfg.openAiChatModel
+        LlmBackend.DEEPSEEK -> cfg.deepSeekModel
+        LlmBackend.QWEN -> cfg.qwenModel
+        LlmBackend.CUSTOM -> cfg.customModel
+    }
 
     private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel, cfg.maxReplyTokens.toLong()) }

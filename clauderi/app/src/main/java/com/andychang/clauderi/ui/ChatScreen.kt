@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.andychang.clauderi.ClaudeRiApp
+import kotlinx.coroutines.launch
 import com.andychang.clauderi.assistant.AssistantState
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.Source
@@ -59,6 +61,7 @@ private const val AUTO_SEND_DELAY_MS = 2_000L
 fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val messages by app.conversation.messages.collectAsState()
+    val scope = rememberCoroutineScope()
     val state by app.assistant.state.collectAsState()
     val draft by app.assistant.voiceDraft.collectAsState()
     val cfg by app.settings.flow.collectAsState(initial = AppSettings())
@@ -113,7 +116,7 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         }
 
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(12.dp)) {
-            items(messages, key = { it.id }) { Bubble(it) }
+            items(messages, key = { it.id }) { m -> Bubble(m, onDelete = { scope.launch { app.conversation.tombstone(it.id) } }) }
         }
 
         if (armed) {

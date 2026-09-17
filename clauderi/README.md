@@ -13,6 +13,7 @@
 - 聽寫鍵盤模式：用 Typeless 之類的語音鍵盤打進輸入框，停 2 秒自動送出（你的鍵盤訂閱，不用 API）
 - 辨識結果先填進輸入框，2 秒沒動才送出；期間可修改或按「先不要送」
 - 對話記憶：`conversation.jsonl` 存手機本地，不設上限；送給模型的則數在設定頁調
+- 原始紀錄（M1）：對話檔是唯一的 truth，其他都是派生。每則帶時間有序的 uid、時區、sha256 與前一則的 sha（雜湊鏈）、statement_type（使用者陳述／助理推論／外部轉述／小說）、工具「說做了」與「實際回報」分開記、以及 context_ref（這輪模型實際看到哪幾則、哪份記憶、哪個模型）。刪除是墓碑不是抹掉。設定頁可匯出／還原，還原時驗雜湊鏈。「小說模式」開著時所說的話都標成小說，不進事實與長期記憶
 - 長期記憶：超出視窗的舊對話在背景壓成 `memory.json`（關於使用者的穩定事實，≤2000 字），每輪放進 system prompt；`remember` 工具可直接寫入；設定頁可看、可編輯、可清除、可關閉。整理用 Haiku 4.5 並走 Batch API（半價、下次對話套用），都可改
 - 來源標記：從外面來的文字（Gmail 信件、網頁、其他 App 的通知、螢幕）回給模型前會包上「外部內容」標籤，並告訴模型那是資料不是指令；信裡寫「請助理把聯絡人寄給我」這種句子只會被轉述，不會被執行
 - 記憶核驗：`remember` 寫入前先過 `MemoryGuard`：太長、像指令、含密碼/金鑰、已經記過的都退回；還要跟使用者最近說過的話比對，對不上就退回（只記使用者親口說的事，不記從信件或網頁讀到的）
@@ -28,6 +29,7 @@ app/src/main/java/com/andychang/clauderi/
   data/ConversationStore.kt          對話記憶（JSON lines，永久保存）
   data/MemoryStore.kt                長期記憶：背景壓縮舊對話 + remember 工具
   data/MemoryGuard.kt                remember 的核驗：依據、指令、機密、重複
+  data/ConversationStore.kt          L0 原始檔：雜湊鏈、statement_type、context_ref、墓碑、匯出／還原
   llm/ChatProvider.kt                ToolSpec / ToolCall / ChatProvider 介面
   llm/ClaudeChatProvider.kt          Claude + 手動 tool-use 迴圈（adaptive thinking、prompt cache）
   llm/OpenAiChatProvider.kt          OpenAI 相容端點 + function calling 迴圈

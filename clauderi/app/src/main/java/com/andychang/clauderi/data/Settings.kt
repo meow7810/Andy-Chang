@@ -69,6 +69,7 @@ data class AppSettings(
     val memoryModel: String = "claude-haiku-4-5",   // compaction is bookkeeping, not reasoning: use the cheap model
     val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
     val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
+    val fictionMode: Boolean = false,               // everything said while on is tagged FICTION: never a fact about the user
     val ttsVoice: String = "",                      // Android TTS voice name; empty = engine default
     val ttsPitch: Float = 1.0f,                     // 0.5 (deep) .. 2.0
     val ttsRate: Float = 1.0f,                      // 0.5 .. 2.0
@@ -114,6 +115,7 @@ class Settings(private val context: Context) {
             memoryModel = p[K.memoryModel] ?: "claude-haiku-4-5",
             memoryUseBatch = p[K.memoryUseBatch] ?: true,
             wakeGreeting = p[K.wakeGreeting] ?: true,
+            fictionMode = p[K.fictionMode] ?: false,
             ttsVoice = p[K.ttsVoice] ?: "",
             ttsPitch = p[K.ttsPitch] ?: 1.0f,
             ttsRate = p[K.ttsRate] ?: 1.0f,
@@ -158,6 +160,7 @@ class Settings(private val context: Context) {
             p[K.memoryModel] = next.memoryModel
             p[K.memoryUseBatch] = next.memoryUseBatch
             p[K.wakeGreeting] = next.wakeGreeting
+            p[K.fictionMode] = next.fictionMode
             p[K.ttsVoice] = next.ttsVoice
             p[K.ttsPitch] = next.ttsPitch
             p[K.ttsRate] = next.ttsRate
@@ -202,6 +205,7 @@ class Settings(private val context: Context) {
         val memoryModel = stringPreferencesKey("memory_model")
         val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
+        val fictionMode = booleanPreferencesKey("fiction_mode")
         val ttsVoice = stringPreferencesKey("tts_voice")
         val ttsPitch = floatPreferencesKey("tts_pitch")
         val ttsRate = floatPreferencesKey("tts_rate")
