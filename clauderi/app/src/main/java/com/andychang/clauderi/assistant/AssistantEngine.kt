@@ -14,6 +14,7 @@ import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.StatementType
 import com.andychang.clauderi.data.ToolOutcome
+import com.andychang.clauderi.data.Traditionalizer
 import org.json.JSONObject
 import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.Personas
@@ -74,6 +75,7 @@ class AssistantEngine(
     private val capabilities: CapabilityRegistry,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val appContext: Context = context.applicationContext
     val speaker = Speaker(context)
     private val recorder = MicRecorder(context)
     private val androidStt = AndroidSpeechToText(context)
@@ -227,7 +229,7 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        val replyText = reply.text.ifBlank { "（本座無話可說。）" }
+        val replyText = Traditionalizer.convert(appContext, reply.text).ifBlank { "（本座無話可說。）" }
         store.append(
             Role.ASSISTANT, replyText, source, toolsUsed = reply.toolsUsed, toolErrors = toolErrors,
             statement = if (cfg.fictionMode) StatementType.FICTION else StatementType.AGENT_INFERENCE,
