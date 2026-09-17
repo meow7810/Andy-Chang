@@ -38,8 +38,13 @@ data class ToolCall(val id: String, val name: String, val args: JSONObject) {
     fun bool(key: String): Boolean? = str(key)?.toBooleanStrictOrNull()
 }
 
-/** [imageJpeg] lets a tool hand the model a picture (Claude: image block inside the tool_result). */
-data class ToolResult(val text: String, val isError: Boolean = false, val imageJpeg: ByteArray? = null)
+/**
+ * [imageJpeg] lets a tool hand the model a picture (Claude: image block inside the tool_result).
+ * [source] marks text that came from outside the app (a mail body, a web page, another app's
+ * notification, the screen). The registry fences such results before the model sees them, so
+ * the model can tell data from instructions.
+ */
+data class ToolResult(val text: String, val isError: Boolean = false, val imageJpeg: ByteArray? = null, val source: String? = null)
 
 fun interface ToolExecutor {
     suspend fun execute(call: ToolCall): ToolResult

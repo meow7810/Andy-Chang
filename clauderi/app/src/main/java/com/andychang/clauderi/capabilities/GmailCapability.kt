@@ -136,7 +136,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
             val snippet = runCatching { textOf(m) }.getOrDefault("").replace(Regex("\\s+"), " ").take(160)
             "[$uid] $date ${if (unread) "●" else "○"} $from｜${decode(m.subject)}\n    $snippet"
         }
-        return ok("共 ${uids.size} 封，顯示最新 ${lines.size} 封：\n" + lines.joinToString("\n"))
+        return external("共 ${uids.size} 封，顯示最新 ${lines.size} 封：\n" + lines.joinToString("\n"), "Gmail 信件")
     }
 
     /**
@@ -172,7 +172,7 @@ class GmailCapability(@Suppress("unused") private val context: Context) : Capabi
         val m = folder.getMessageByUID(uid) ?: return err("找不到 id $uid 的信（可能已被刪除）")
         val from = m.from?.joinToString { (it as? InternetAddress)?.toUnicodeString() ?: it.toString() } ?: "?"
         val body = textOf(m).trim().take(4000)
-        return ok("寄件者：$from\n主旨：${decode(m.subject)}\n時間：${m.sentDate?.let { fmt.format(it) } ?: ""}\n\n$body")
+        return external("寄件者：$from\n主旨：${decode(m.subject)}\n時間：${m.sentDate?.let { fmt.format(it) } ?: ""}\n\n$body", "Gmail 信件（寄件者 $from）")
     }
 
     /**

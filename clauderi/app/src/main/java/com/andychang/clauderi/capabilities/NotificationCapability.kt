@@ -123,10 +123,10 @@ class NotificationCapability(private val context: Context) : Capability {
                 else {
                     val list = NotificationStore.active.value
                     if (list.isEmpty()) ok("目前沒有來自允許的 App 的通知。")
-                    else ok(list.joinToString("\n") {
+                    else external(list.joinToString("\n") {
                         "[${it.key}] ${fmt.format(Date(it.postedAt))} ${it.appLabel}｜${it.title}：${it.text}" +
                             if (it.canReply) "（可回覆）" else ""
-                    })
+                    }, "其他 App 的通知")
                 }
             }
             "reply_notification" -> {

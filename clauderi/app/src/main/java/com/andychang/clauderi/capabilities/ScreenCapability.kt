@@ -81,7 +81,7 @@ class ScreenCapability(private val context: Context) : Capability {
         if (call.name != "read_screen") return null
         val svc = ScreenReaderService.instance ?: return err("使用者尚未在系統無障礙設定中啟用 ClaudeRi 螢幕感知服務。")
         val (pkg, text) = svc.readNow()
-        return if (text.isBlank()) ok("畫面上沒有可讀取的文字（App：$pkg）。") else ok("App：$pkg\n$text")
+        return if (text.isBlank()) ok("畫面上沒有可讀取的文字（App：$pkg）。") else external("App：$pkg\n$text", "螢幕上的文字（$pkg）")
     }
 
     fun serviceEnabled(): Boolean {

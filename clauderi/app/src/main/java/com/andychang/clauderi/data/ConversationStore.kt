@@ -56,6 +56,11 @@ class ConversationStore(context: Context) {
         _messages.value = emptyList()
     }
 
+    /** What the user said in their last [count] messages, joined; used to ground `remember` notes. */
+    fun recentUserText(count: Int): String =
+        _messages.value.asReversed().asSequence().filter { it.role == Role.USER && !it.error }.take(count)
+            .joinToString("\n") { it.text }
+
     /** Last [turns] non-error messages, provider-neutral. */
     fun recentTurns(turns: Int): List<ChatTurn> =
         _messages.value.filter { !it.error }.takeLast(turns).map { ChatTurn(it.role, it.text) }

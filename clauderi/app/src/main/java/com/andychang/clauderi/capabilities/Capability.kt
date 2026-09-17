@@ -24,3 +24,5 @@ interface Capability {
 
 fun err(msg: String) = ToolResult(msg, isError = true)
 fun ok(msg: String) = ToolResult(msg)
+/** Content that originated outside the phone's owner: fenced as data before the model reads it. */
+fun external(msg: String, source: String) = ToolResult(msg, source = source)

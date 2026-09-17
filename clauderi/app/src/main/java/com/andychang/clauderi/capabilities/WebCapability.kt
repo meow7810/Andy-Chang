@@ -52,7 +52,7 @@ class WebCapability(@Suppress("unused") private val context: Context) : Capabili
                     val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(body)?.groupValues?.get(1)?.trim()?.let { decodeEntities(it) }
                     val clean = text.trim().take(8000)
                     if (clean.isBlank()) err("這頁沒有可讀的文字（可能是純圖片或需要登入）")
-                    else ok((title?.let { "標題：$it\n\n" } ?: "") + clean)
+                    else external((title?.let { "標題：$it\n\n" } ?: "") + clean, "網頁 ${runCatching { java.net.URI(url).host }.getOrNull() ?: url}")
                 }
             } catch (e: Exception) {
                 err("無法開啟：${e.message}")
