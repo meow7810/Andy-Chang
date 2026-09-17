@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -211,7 +212,15 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             Switch(checked = draft.longTermMemory, onCheckedChange = { draft = draft.copy(longTermMemory = it) })
         }
         if (draft.longTermMemory) {
-            if (draft.llm == LlmBackend.CLAUDE) {
+            Text("整理記憶用哪個腦", style = MaterialTheme.typography.labelLarge)
+            Text("整理是記帳不是聊天，不需要人設，可以交給便宜的後端（例如 Gemini 的抵用額）。失敗會下次再試，你感覺不到。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                FilterChip(selected = draft.memoryBackend.isBlank(), onClick = { draft = draft.copy(memoryBackend = "") }, label = { Text("跟主模型一樣") })
+                LlmBackend.entries.forEach { b ->
+                    FilterChip(selected = draft.memoryBackend == b.name, onClick = { draft = draft.copy(memoryBackend = b.name) }, label = { Text(b.label) })
+                }
+            }
+            if (draft.memoryBackendOrMain() == LlmBackend.CLAUDE) {
                 Plain(draft.memoryModel, "整理記憶用的模型（預設 claude-haiku-4-5，便宜五倍）") { draft = draft.copy(memoryModel = it) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) {

@@ -71,6 +71,7 @@ data class AppSettings(
     val longTermMemory: Boolean = true,             // fold old turns into a curated memory file; off = sliding window only
     val memoryModel: String = "claude-haiku-4-5",   // compaction is bookkeeping, not reasoning: use the cheap model
     val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
+    val memoryBackend: String = "",                 // LlmBackend name for compaction; "" = same as the main model. Background work can go to a cheaper, less stable brain
     val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
     val fictionMode: Boolean = false,               // everything said while on is tagged FICTION: never a fact about the user
     val listeningLog: Boolean = false,              // MUSIC: record what was played (title, artist, time listened) to listening.jsonl
@@ -83,6 +84,8 @@ data class AppSettings(
     val twdPerUsd: Float = 32f,                    // for showing the USD estimate in NT$
 ) {
     fun has(cap: CapabilityId) = cap in enabledCapabilities
+    /** Backend used for memory compaction: the chosen one, else the main model. */
+    fun memoryBackendOrMain(): LlmBackend = memoryBackend.takeIf { it.isNotBlank() }?.let { n -> LlmBackend.entries.firstOrNull { it.name == n } } ?: llm
 }
 
 class Settings(private val context: Context) {
@@ -124,6 +127,7 @@ class Settings(private val context: Context) {
             longTermMemory = p[K.longTermMemory] ?: true,
             memoryModel = p[K.memoryModel] ?: "claude-haiku-4-5",
             memoryUseBatch = p[K.memoryUseBatch] ?: true,
+            memoryBackend = p[K.memoryBackend] ?: "",
             wakeGreeting = p[K.wakeGreeting] ?: true,
             fictionMode = p[K.fictionMode] ?: false,
             listeningLog = p[K.listeningLog] ?: false,
@@ -176,6 +180,7 @@ class Settings(private val context: Context) {
             p[K.longTermMemory] = next.longTermMemory
             p[K.memoryModel] = next.memoryModel
             p[K.memoryUseBatch] = next.memoryUseBatch
+            p[K.memoryBackend] = next.memoryBackend
             p[K.wakeGreeting] = next.wakeGreeting
             p[K.fictionMode] = next.fictionMode
             p[K.listeningLog] = next.listeningLog
@@ -228,6 +233,7 @@ class Settings(private val context: Context) {
         val longTermMemory = booleanPreferencesKey("long_term_memory")
         val memoryModel = stringPreferencesKey("memory_model")
         val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
+        val memoryBackend = stringPreferencesKey("memory_backend")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
         val fictionMode = booleanPreferencesKey("fiction_mode")
         val listeningLog = booleanPreferencesKey("listening_log")

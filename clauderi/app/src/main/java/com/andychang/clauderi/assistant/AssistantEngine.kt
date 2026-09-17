@@ -342,15 +342,19 @@ class AssistantEngine(
     }
 
     /** Claude backend: cheap model + Batch. Anything else: the chat provider itself, synchronously. */
-    private fun buildSummarizer(cfg: AppSettings, llm: ChatProvider): MemorySummarizer =
-        if (cfg.llm == LlmBackend.CLAUDE && cfg.anthropicKey.isNotBlank()) {
+    private fun buildSummarizer(cfg: AppSettings, llm: ChatProvider): MemorySummarizer {
+        val backend = cfg.memoryBackendOrMain()
+        if (backend == LlmBackend.CLAUDE && cfg.anthropicKey.isNotBlank()) {
             val model = cfg.memoryModel.ifBlank { ClaudeMemorySummarizer.DEFAULT_MODEL }
-            ClaudeMemorySummarizer(cfg.anthropicKey, model, cfg.memoryUseBatch) { u, batch -> ledger.record("memory", "claude", model, u, batch) }
-        } else {
-            DirectSummarizer(llm) { u, _ -> ledger.record("memory", llm.id, modelName(cfg), u) }
+            return ClaudeMemorySummarizer(cfg.anthropicKey, model, cfg.memoryUseBatch) { u, batch -> ledger.record("memory", "claude", model, u, batch) }
         }
+        // A separate, cheaper brain for bookkeeping; falls back to the main model if it is not configured.
+        val worker = if (backend == cfg.llm) llm else (buildLlm(cfg, backend) ?: llm)
+        val model = modelName(cfg, if (worker === llm) cfg.llm else backend)
+        return DirectSummarizer(worker) { u, _ -> ledger.record("memory", worker.id, model, u) }
+    }
 
-    private fun modelName(cfg: AppSettings): String = when (cfg.llm) {
+    private fun modelName(cfg: AppSettings, backend: LlmBackend = cfg.llm): String = when (backend) {
         LlmBackend.CLAUDE -> cfg.claudeModel
         LlmBackend.OPENAI -> cfg.openAiChatModel
         LlmBackend.DEEPSEEK -> cfg.deepSeekModel
@@ -359,7 +363,7 @@ class AssistantEngine(
         LlmBackend.CUSTOM -> cfg.customModel
     }
 
-    private fun buildLlm(cfg: AppSettings): ChatProvider? = when (cfg.llm) {
+    private fun buildLlm(cfg: AppSettings, backend: LlmBackend = cfg.llm): ChatProvider? = when (backend) {
         LlmBackend.CLAUDE -> cfg.anthropicKey.takeIf { it.isNotBlank() }?.let { ClaudeChatProvider(it, cfg.claudeModel, cfg.maxReplyTokens.toLong()) }
         LlmBackend.OPENAI -> cfg.openAiKey.takeIf { it.isNotBlank() }?.let { OpenAiChatProvider(it, cfg.openAiChatModel) }
         LlmBackend.GEMINI -> cfg.geminiKey.takeIf { it.isNotBlank() }?.let {
