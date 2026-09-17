@@ -139,7 +139,7 @@ class CapabilityRegistry(
         val hits = HistorySearch.search(history, query, limit, after, before)
         if (hits.isEmpty()) return ok(if (query.isEmpty()) "那段時間沒有對話紀錄。" else "對話紀錄裡找不到「$query」。可以換個關鍵字、換個寫法（語音辨識常聽錯字），或只給日期看那段時間的紀錄。")
         val total = HistorySearch.count(history, query, after, before)
-        return external(HistorySearch.render(history, hits, total), "過去的對話紀錄")
+        return external(HistorySearch.render(history, hits, total, withContext = query.isNotEmpty()), "過去的對話紀錄")
     }
 
     private suspend fun handleRequest(call: ToolCall, cfg: AppSettings): ToolResult {

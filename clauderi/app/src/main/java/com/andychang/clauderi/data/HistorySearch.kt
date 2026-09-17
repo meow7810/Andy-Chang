@@ -73,11 +73,11 @@ object HistorySearch {
     }
 
     /** Tool-facing text: one block per hit with date, speaker, provenance marks and the neighbour turn. */
-    fun render(messages: List<ChatMessage>, hits: List<Hit>, total: Int, zone: ZoneId = ZoneId.systemDefault()): String {
+    fun render(messages: List<ChatMessage>, hits: List<Hit>, total: Int, zone: ZoneId = ZoneId.systemDefault(), withContext: Boolean = true): String {
         if (hits.isEmpty()) return "對話紀錄裡找不到。"
         val byId = messages.associateBy { it.id }
         val fmt = SimpleDateFormat("yyyy-MM-dd(E) HH:mm", Locale.TAIWAN).apply { timeZone = java.util.TimeZone.getTimeZone(zone) }
-        val sb = StringBuilder("共 $total 則相符，顯示 ${hits.size} 則（相符度高的在前，同分新的在前）：\n")
+        val sb = StringBuilder(if (withContext) "共 $total 則相符，顯示 ${hits.size} 則（相符度高的在前，同分新的在前）：\n" else "那段時間共 $total 則，顯示前 ${hits.size} 則（按時間）：\n")
         for (h in hits) {
             val m = h.message
             sb.append("\n#").append(m.id)
@@ -86,7 +86,7 @@ object HistorySearch {
             sb.append(clip(m.text)).append('\n')
             // The exchange around it, so a quote is not read out of context and a correction one line
             // later ("no, I meant X") is visible too.
-            for (d in listOf(-1, 1, 2)) {
+            if (withContext) for (d in listOf(-1, 1, 2)) {
                 val n = byId[m.id + d] ?: continue
                 if (n.deleted || n.error || n.text.isBlank()) continue
                 sb.append(if (d < 0) "    ↑ " else "    ↳ ").append(speaker(n)).append("：").append(clip(n.text, 120)).append('\n')
