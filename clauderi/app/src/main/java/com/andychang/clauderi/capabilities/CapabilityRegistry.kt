@@ -126,7 +126,7 @@ class CapabilityRegistry(
         return when (val v = MemoryGuard.check(note, memory.text.value, recentUserText)) {
             MemoryGuard.Verdict.Accept -> { memory.appendNote(note); ok("已記住：$note") }
             MemoryGuard.Verdict.Duplicate -> ok("這件事已經在長期記憶裡了，不重複記。")
-            is MemoryGuard.Verdict.Reject -> err("沒有寫入：${v.reason}")
+            is MemoryGuard.Verdict.Reject -> err("沒有寫入「${note.take(80)}」：${v.reason}")
         }
     }
 

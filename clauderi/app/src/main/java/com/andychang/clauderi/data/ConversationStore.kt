@@ -213,10 +213,16 @@ class ConversationStore(context: Context) {
     fun recentTurns(turns: Int, brain: String = "", includeTest: Boolean = false): List<ChatTurn> =
         window(turns, includeTest).map { ChatTurn(it.role, markedText(it, brain)) }
 
-    private fun markedText(m: ChatMessage, brain: String): String = when {
-        m.role == Role.USER && m.source == Source.VOICE -> "$VOICE_MARK" + m.text
-        m.role == Role.ASSISTANT && m.brain.isNotEmpty() && brain.isNotEmpty() && m.brain != brain -> "$OTHER_BRAIN_MARK" + m.text
-        else -> m.text
+    private fun markedText(m: ChatMessage, brain: String): String {
+        val base = when {
+            m.role == Role.USER && m.source == Source.VOICE -> "$VOICE_MARK" + m.text
+            m.role == Role.ASSISTANT && m.brain.isNotEmpty() && brain.isNotEmpty() && m.brain != brain -> "$OTHER_BRAIN_MARK" + m.text
+            else -> m.text
+        }
+        // Tool calls are not replayed into later turns, so without this a reply that already played a
+        // song reads, next turn, like a promise still to keep, and the model plays it again.
+        val ran = m.toolsUsed.filter { it != "search_history" && it != "request_capability" }
+        return if (m.role == Role.ASSISTANT && ran.isNotEmpty()) "$base\n〔這輪已執行：${ran.distinct().joinToString("、")}〕" else base
     }
 
     /** The ids the model will see for [turns], so the assistant's reply can record what it was shown. */

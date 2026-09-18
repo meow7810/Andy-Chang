@@ -86,7 +86,7 @@ class ClaudeChatProvider(
             if (stop == StopReason.REFUSAL) return@withContext ChatReply("抱歉，這個問題我不方便回答。", used, usage)
 
             messages += response.toParam()
-            val text = response.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim()
+            val text = finalText(response.content())
             if (response.content().any { it.serverToolUse().isPresent } && "web_search" !in used) used += "web_search"
 
             // Server-side tools (web search) can hand the turn back mid-way; just ask it to continue.
@@ -137,7 +137,19 @@ class ClaudeChatProvider(
             throw LlmException("Claude API error ${e.statusCode()}: ${e.message}", e)
         }
         usage += usageOf(last)
-        ChatReply(last.content().mapNotNull { b -> b.text().orElse(null)?.text() }.joinToString("").trim(), used, usage)
+        ChatReply(finalText(last.content()), used, usage)
+    }
+
+    /**
+     * A response that ran a server-side tool (web search) carries text before the search and text
+     * after it, and the model tends to restate the first part. Only the text after the last
+     * non-text block is the answer; the rest was it thinking aloud.
+     */
+    private fun finalText(blocks: List<com.anthropic.models.messages.ContentBlock>): String {
+        val lastNonText = blocks.indexOfLast { !it.text().isPresent }
+        val after = blocks.withIndex().filter { it.index > lastNonText }.mapNotNull { it.value.text().orElse(null)?.text() }
+        val chosen = if (after.isNotEmpty()) after else blocks.mapNotNull { it.text().orElse(null)?.text() }
+        return chosen.joinToString("").trim()
     }
 
     private fun usageOf(m: Message): Usage {
