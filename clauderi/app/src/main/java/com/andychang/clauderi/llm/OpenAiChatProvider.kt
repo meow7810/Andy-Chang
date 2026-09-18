@@ -1,7 +1,16 @@
 package com.andychang.clauderi.llm
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
+import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -112,29 +121,43 @@ class OpenAiChatProvider(
      * answers (429, 500, 502, 503, 504) and connection failures are retried a few times with
      * backoff; anything else (401, 404, 400) is reported at once.
      */
-    private fun post(payload: JSONObject): JSONObject {
+    private suspend fun post(payload: JSONObject): JSONObject {
         val body = payload.toString().toRequestBody("application/json".toMediaType())
         var last: LlmException? = null
         repeat(MAX_ATTEMPTS) { attempt ->
+            coroutineContext.ensureActive()   // a cancelled or timed-out turn stops here, not after four more tries
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/chat/completions")
                 .header("Authorization", "Bearer $apiKey")
                 .post(body)
                 .build()
             try {
-                client.newCall(req).execute().use { resp ->
-                    val text = resp.body?.string().orEmpty()
-                    if (resp.isSuccessful) return JSONObject(text)
-                    val e = LlmException("$id HTTP ${resp.code}: ${text.take(600)}")
-                    if (resp.code !in RETRYABLE) throw e
-                    last = e
-                }
+                val (code, text) = client.newCall(req).await()
+                if (code in 200..299) return JSONObject(text)
+                val e = LlmException("$id HTTP $code: ${text.take(600)}")
+                if (code !in RETRYABLE) throw e
+                last = e
             } catch (e: java.io.IOException) {
                 last = LlmException("$id 連線失敗：${e.message}", e)
             }
-            if (attempt < MAX_ATTEMPTS - 1) Thread.sleep(BACKOFF_MS shl attempt)
+            if (attempt < MAX_ATTEMPTS - 1) delay(BACKOFF_MS shl attempt)
         }
         throw last ?: LlmException("$id 沒有回應")
+    }
+
+    /**
+     * Cancellable HTTP: the blocking execute() cannot be interrupted, so a turn that hit its
+     * ceiling kept the socket (and the "思考中" spinner) alive until the read timeout. Enqueue
+     * instead, and cancel the call when the coroutine is cancelled.
+     */
+    private suspend fun Call.await(): Pair<Int, String> = suspendCancellableCoroutine { cont ->
+        enqueue(object : Callback {
+            override fun onFailure(call: Call, e: java.io.IOException) { if (cont.isActive) cont.resumeWithException(e) }
+            override fun onResponse(call: Call, response: Response) {
+                response.use { r -> runCatching { r.code to r.body?.string().orEmpty() }.fold({ cont.resume(it) }, { cont.resumeWithException(it) }) }
+            }
+        })
+        cont.invokeOnCancellation { cancel() }
     }
 
     companion object {

@@ -41,7 +41,7 @@ class ClaudeChatProvider(
 
     override val id = "claude"
 
-    private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
+    private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).timeout(java.time.Duration.ofSeconds(90)).build()
 
     override suspend fun reply(
         systemPrompt: suspend () -> SystemPrompt, history: List<ChatTurn>, tools: suspend () -> List<ToolSpec>, executor: ToolExecutor,
