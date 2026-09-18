@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -306,6 +307,10 @@ class AssistantEngine(
                     executor = executor,
                 )
             }
+        } catch (e: TimeoutCancellationException) {
+            store.append(Role.ASSISTANT, "（逾時：等了 ${TURN_TIMEOUT_MS / 1000} 秒沒有回覆。）", source, error = true, contextRef = contextRef, prov = "app")
+            _state.value = AssistantState.Error("這一題逾時了，訊號或服務端太慢。再送一次就好。")
+            return@withLock
         } catch (e: CancellationException) {
             store.append(Role.ASSISTANT, "（已取消。）", source, error = true, contextRef = contextRef, prov = "app")
             _state.value = AssistantState.Idle
