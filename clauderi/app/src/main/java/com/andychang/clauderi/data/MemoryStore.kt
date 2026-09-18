@@ -85,7 +85,6 @@ class MemoryStore(context: Context) {
      * @param batch how many old messages must accumulate before a compaction is worth an API call
      */
     suspend fun maybeCompact(summarizer: MemorySummarizer, messages: List<ChatMessage>, windowTurns: Int, batch: Int = 20) {
-        interpreter = summarizer.label
         if (!compactMutex.tryLock()) return
         try {
             // 1. A job in flight? See if it finished.
@@ -94,6 +93,7 @@ class MemoryStore(context: Context) {
                     Log.w(TAG, "batch job $job failed, will retry directly next time", e); pendingJob = null; null
                 }
                 if (result == null) return
+                interpreter = summarizer.label
                 apply(result, pendingUpTo)
                 pendingJob = null
                 return
@@ -109,6 +109,7 @@ class MemoryStore(context: Context) {
             val chunk = eligible.take(batch * 3)
             val prompt = buildPrompt(chunk)
             val job = summarizer.submit(prompt)
+            interpreter = summarizer.label
             if (job != null) {
                 pendingJob = job
                 pendingUpTo = chunk.last().id
