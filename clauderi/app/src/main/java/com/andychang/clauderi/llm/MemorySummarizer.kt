@@ -13,6 +13,8 @@ import kotlinx.coroutines.withContext
  * the Batch API (half price, results within 24 h).
  */
 interface MemorySummarizer {
+    /** "backend:model", recorded on whatever this summariser writes. */
+    val label: String get() = "unknown"
     /** Synchronous summary, full price. */
     suspend fun summarize(prompt: String): String
     /** Submit for asynchronous processing; returns a job id, or null if this backend has no batch mode. */
@@ -22,7 +24,12 @@ interface MemorySummarizer {
 }
 
 /** Any chat backend can summarise directly (no batch). */
-class DirectSummarizer(private val provider: ChatProvider, private val onUsage: (Usage, Boolean) -> Unit = { _, _ -> }) : MemorySummarizer {
+class DirectSummarizer(
+    private val provider: ChatProvider,
+    private val model: String = "",
+    private val onUsage: (Usage, Boolean) -> Unit = { _, _ -> },
+) : MemorySummarizer {
+    override val label: String get() = provider.id + ":" + model
     override suspend fun summarize(prompt: String): String = provider.reply(
         systemPrompt = { SystemPrompt(SYSTEM, "") },
         history = listOf(ChatTurn(Role.USER, prompt)),
@@ -45,6 +52,8 @@ class ClaudeMemorySummarizer(
 ) : MemorySummarizer {
 
     private val client: AnthropicClient = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
+
+    override val label: String get() = "claude:$model"
 
     override suspend fun summarize(prompt: String): String = withContext(Dispatchers.IO) {
         val resp = client.messages().create(

@@ -24,7 +24,26 @@ enum class Source { VOICE, TEXT, PHOTO }   // PHOTO: a picture opened the turn, 
  * fact about the user; a line the assistant guessed is not something the user said. Facts and
  * summaries only ever draw on USER_STATEMENT.
  */
-enum class StatementType { USER_STATEMENT, AGENT_INFERENCE, EXTERNAL_REPORT, FICTION, EVENT }   // EVENT: something happened, nobody said it
+enum class StatementType { USER_STATEMENT, AGENT_INFERENCE, EXTERNAL_REPORT, FICTION, EVENT, TEST }
+// EVENT: something happened, nobody said it. TEST: the user was testing the assistant (test mode on); stays in
+// the file, but is shown to nobody: not the model's window, not search_history, not compaction.
+
+/**
+ * Allowed uses of one line, decided at write time from who wrote it and in what mode. Provenance
+ * decides what a piece of data may later become; nothing downstream may widen this set.
+ *   recall  - may be quoted back (search_history, the model's history window)
+ *   memory  - may feed long-term memory compaction
+ *   eval    - exists for a test run only
+ * "persona" and "train" are deliberately absent by default: the user grants those per line, never the app.
+ */
+object Uses {
+    const val RECALL = "recall"; const val MEMORY = "memory"; const val EVAL = "eval"
+    fun default(role: Role, statement: StatementType): Set<String> = when (statement) {
+        StatementType.TEST -> setOf(EVAL)
+        StatementType.USER_STATEMENT -> if (role == Role.USER) setOf(RECALL, MEMORY) else setOf(RECALL)
+        else -> setOf(RECALL)
+    }
+}
 
 /** What a tool actually reported back, separate from what the assistant claimed it did. */
 data class ToolOutcome(val name: String, val observed: String)   // "ok" | "error" | "unknown"
@@ -46,8 +65,15 @@ data class ChatMessage(
     val sha: String = "",                         // sha256 over (uid, role, createdAt, text); "" on legacy lines
     val prev: String = "",                        // previous message's sha: the file is a hash chain
     val deletedAt: Long? = null,                  // tombstone: text is gone, the slot remains
+    val prov: String = "",                        // authorship: "human:text" | "human:voice" | "model:<backend>:<model>" | "app:event" | "app"; "" = unknown (legacy)
+    val uses: Set<String> = emptySet(),           // see [Uses]; empty on legacy lines = treated as [Uses.default]
 ) {
     val deleted: Boolean get() = deletedAt != null
+    val allowedUses: Set<String> get() = uses.ifEmpty { Uses.default(role, statement) }
+    /** "claude", "gemini", ... for a model-written line; "" otherwise. */
+    val brain: String get() = if (prov.startsWith("model:")) prov.removePrefix("model:").substringBefore(':') else ""
+    /** Hidden from every reader except the file itself and the eval view. */
+    val hidden: Boolean get() = error || deleted || statement == StatementType.TEST
 }
 
 data class ImportReport(val messages: Int, val tombstones: Int, val chainOk: Boolean, val schema: String)
@@ -75,6 +101,7 @@ class ConversationStore(context: Context) {
         statement: StatementType = if (role == Role.USER) StatementType.USER_STATEMENT else StatementType.AGENT_INFERENCE,
         toolOutcomes: List<ToolOutcome> = emptyList(),
         contextRef: String? = null,
+        prov: String = "",
     ): ChatMessage = mutex.withLock {
         val last = _messages.value.lastOrNull()
         val now = System.currentTimeMillis()
@@ -86,6 +113,7 @@ class ConversationStore(context: Context) {
             uid = uid, tz = TimeZone.getDefault().id, statement = statement,
             toolOutcomes = toolOutcomes, contextRef = contextRef,
             sha = digest(uid, role, now, text), prev = last?.sha.orEmpty(),
+            prov = prov, uses = Uses.default(role, statement),
         )
         if (!file.exists()) file.appendText(HEADER + "\n")
         file.appendText(toJson(msg).toString() + "\n")
@@ -163,25 +191,36 @@ class ConversationStore(context: Context) {
     /** What the user said in their last [count] messages, joined; used to ground `remember` notes. */
     fun recentUserText(count: Int): String =
         _messages.value.asReversed().asSequence()
-            .filter { it.role == Role.USER && !it.error && !it.deleted && it.statement == StatementType.USER_STATEMENT }
+            .filter { it.role == Role.USER && !it.hidden && it.statement == StatementType.USER_STATEMENT }
             .take(count).joinToString("\n") { it.text }
 
     /** (first message time, live message count) for the prompt's "there is more history" hint; null when empty. */
     fun archiveSpan(): Pair<Long, Int>? {
-        val live = _messages.value.filter { !it.deleted && !it.error }
+        val live = _messages.value.filter { !it.hidden }
         val first = live.firstOrNull() ?: return null
         return first.createdAt to live.size
     }
 
-    /** Last [turns] non-error messages, provider-neutral. Tombstoned messages are skipped. */
-    fun recentTurns(turns: Int): List<ChatTurn> =
-        window(turns).map { ChatTurn(it.role, it.text) }
+    /**
+     * Last [turns] visible messages, provider-neutral. Tombstoned, error and test lines are skipped.
+     * Each turn carries its provenance in plain text so the model can tell a spoken line from a
+     * typed one, and a reply written by a previous brain ([brain] = the current provider id) from
+     * its own. Without these marks a swapped-in model reads the whole window as itself.
+     */
+    fun recentTurns(turns: Int, brain: String = ""): List<ChatTurn> =
+        window(turns).map { ChatTurn(it.role, markedText(it, brain)) }
+
+    private fun markedText(m: ChatMessage, brain: String): String = when {
+        m.role == Role.USER && m.source == Source.VOICE -> "$VOICE_MARK" + m.text
+        m.role == Role.ASSISTANT && m.brain.isNotEmpty() && brain.isNotEmpty() && m.brain != brain -> "$OTHER_BRAIN_MARK" + m.text
+        else -> m.text
+    }
 
     /** The ids the model will see for [turns], so the assistant's reply can record what it was shown. */
     fun windowIds(turns: Int): Pair<Long, Long>? =
         window(turns).let { w -> if (w.isEmpty()) null else w.first().id to w.last().id }
 
-    private fun window(turns: Int) = _messages.value.filter { !it.error && !it.deleted }.takeLast(turns)
+    private fun window(turns: Int) = _messages.value.filter { !it.hidden }.takeLast(turns)
 
     // ------------------------------------------------------------------ file format
 
@@ -236,6 +275,8 @@ class ConversationStore(context: Context) {
             sha = o.optString("sha", ""),
             prev = o.optString("prev", ""),
             deletedAt = if (o.has("del")) o.getLong("del") else null,
+            prov = o.optString("prov", ""),
+            uses = o.optJSONArray("uses")?.let { arr -> List(arr.length()) { arr.getString(it) }.toSet() } ?: emptySet(),
         )
     }.getOrNull()
 
@@ -249,11 +290,15 @@ class ConversationStore(context: Context) {
         .also { o ->
             m.contextRef?.let { o.put("ctx", it) }
             m.deletedAt?.let { o.put("del", it) }
+            if (m.prov.isNotEmpty()) o.put("prov", m.prov)
+            if (m.uses.isNotEmpty()) o.put("uses", JSONArray(m.uses.toList()))
         }
 
     companion object {
         /** Bump when a field changes meaning. Readers must tolerate unknown fields and missing new ones. */
-        const val SCHEMA = "lordclaude-conversation/1"
+        const val SCHEMA = "lordclaude-conversation/2"   // /2: prov, uses, statement TEST. /1 files read unchanged
+        const val VOICE_MARK = "〔語音〕"
+        const val OTHER_BRAIN_MARK = "〔換腦前〕"
         private val HEADER = JSONObject().put("schema", SCHEMA).toString()
         private val rng = SecureRandom()
 

@@ -258,6 +258,20 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
             }
             Switch(checked = draft.fictionMode, onCheckedChange = { draft = draft.copy(fictionMode = it) })
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("測試模式")
+                Text("開著的時候說的話都標成「測試」：留在檔案裡，但他之後看不到（不進視窗、不進搜尋、不進記憶）。做回憶測試時開，測完關，測試題就不會污染下一次。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.testMode, onCheckedChange = { draft = draft.copy(testMode = it) })
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("他可以不順著你")
+                Text("開著：意見不同時他有理由就守住立場，不因為你不高興就改口。關掉：說一次他的看法，然後照你的。這是個性設定，改動會留在養成紀錄裡。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Switch(checked = draft.stance == "hold", onCheckedChange = { draft = draft.copy(stance = if (it) "hold" else "yield") })
+        }
         Text("對話檔案", style = MaterialTheme.typography.titleSmall)
         Text("對話是唯一的原始紀錄，其他都是從它算出來的。匯出的檔案就是原始格式（JSON lines，含雜湊鏈），可以在另一支手機還原。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

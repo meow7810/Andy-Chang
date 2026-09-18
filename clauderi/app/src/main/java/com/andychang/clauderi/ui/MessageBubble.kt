@@ -75,6 +75,8 @@ internal fun Bubble(m: ChatMessage, onDelete: ((ChatMessage) -> Unit)? = null) {
                 val meta = buildString {
                     append(when (m.source) { Source.VOICE -> "🎙 語音"; Source.PHOTO -> "📷 照片"; Source.TEXT -> "⌨ 文字" })
                     if (m.statement == com.andychang.clauderi.data.StatementType.FICTION) append("  📖 小說")
+                    if (m.statement == com.andychang.clauderi.data.StatementType.TEST) append("  🧪 測試")
+                    if (m.brain.isNotEmpty()) append("  🧠 ").append(m.brain)
                     if (m.toolsUsed.isNotEmpty()) append("  🔧 ").append(m.toolsUsed.distinct().joinToString(", "))
                 }
                 Text(meta, style = MaterialTheme.typography.labelSmall, color = Color.Gray)

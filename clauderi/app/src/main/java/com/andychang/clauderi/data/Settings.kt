@@ -74,6 +74,8 @@ data class AppSettings(
     val memoryBackend: String = "",                 // LlmBackend name for compaction; "" = same as the main model. Background work can go to a cheaper, less stable brain
     val wakeGreeting: Boolean = true,               // speak the wake line when summoned by long-press Home
     val fictionMode: Boolean = false,               // everything said while on is tagged FICTION: never a fact about the user
+    val testMode: Boolean = false,                  // everything said while on is tagged TEST: kept in the file, shown to nobody (not the window, not search, not memory)
+    val stance: String = "hold",                    // "hold": he keeps a reasoned position when you are displeased; "yield": says it once, then follows you. Personality policy, not a capability
     val listeningLog: Boolean = false,              // MUSIC: record what was played (title, artist, time listened) to listening.jsonl
     val photoDoor: Boolean = false,                 // CAMERA: a photo taken from the chat's camera button is shown to the model, which may speak first
     val photoDoorGallery: Boolean = false,          // CAMERA: every new photo in the gallery does the same (needs READ_MEDIA_IMAGES)
@@ -130,6 +132,8 @@ class Settings(private val context: Context) {
             memoryBackend = p[K.memoryBackend] ?: "",
             wakeGreeting = p[K.wakeGreeting] ?: true,
             fictionMode = p[K.fictionMode] ?: false,
+            testMode = p[K.testMode] ?: false,
+            stance = p[K.stance] ?: "hold",
             listeningLog = p[K.listeningLog] ?: false,
             photoDoor = p[K.photoDoor] ?: false,
             photoDoorGallery = p[K.photoDoorGallery] ?: false,
@@ -183,6 +187,8 @@ class Settings(private val context: Context) {
             p[K.memoryBackend] = next.memoryBackend
             p[K.wakeGreeting] = next.wakeGreeting
             p[K.fictionMode] = next.fictionMode
+            p[K.testMode] = next.testMode
+            p[K.stance] = next.stance
             p[K.listeningLog] = next.listeningLog
             p[K.photoDoor] = next.photoDoor
             p[K.photoDoorGallery] = next.photoDoorGallery
@@ -236,6 +242,8 @@ class Settings(private val context: Context) {
         val memoryBackend = stringPreferencesKey("memory_backend")
         val wakeGreeting = booleanPreferencesKey("wake_greeting")
         val fictionMode = booleanPreferencesKey("fiction_mode")
+        val testMode = booleanPreferencesKey("test_mode")
+        val stance = stringPreferencesKey("stance")
         val listeningLog = booleanPreferencesKey("listening_log")
         val photoDoor = booleanPreferencesKey("photo_door")
         val photoDoorGallery = booleanPreferencesKey("photo_door_gallery")

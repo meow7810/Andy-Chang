@@ -51,7 +51,7 @@ object HistorySearch {
         val toMs = before?.plusDays(1)?.atStartOfDay(zone)?.plusHours(5)?.toInstant()?.toEpochMilli()
 
         return messages.asSequence()
-            .filter { !it.deleted && !it.error && it.text.isNotBlank() }
+            .filter { !it.hidden && it.text.isNotBlank() }
             .filter { fromMs == null || it.createdAt >= fromMs }
             .filter { toMs == null || it.createdAt < toMs }
             .mapNotNull { m ->
@@ -90,7 +90,7 @@ object HistorySearch {
             // later ("no, I meant X") is visible too.
             if (withContext) for (d in listOf(-1, 1, 2)) {
                 val n = byId[m.id + d] ?: continue
-                if (n.deleted || n.error || n.text.isBlank()) continue
+                if (n.hidden || n.text.isBlank()) continue
                 sb.append(if (d < 0) "    ↑ " else "    ↳ ").append(speaker(n)).append("：").append(clip(n.text, 120)).append('\n')
             }
         }
@@ -98,7 +98,11 @@ object HistorySearch {
     }
 
     private fun speaker(m: ChatMessage): String {
-        val who = if (m.role == Role.USER) "使用者" else "助理"
+        val who = when {
+            m.role == Role.USER -> if (m.source == Source.VOICE) "使用者（語音）" else "使用者"
+            m.brain.isNotEmpty() -> "助理（${m.brain}）"
+            else -> "助理"
+        }
         return when (m.statement) {
             StatementType.FICTION -> "$who（小說模式）"
             StatementType.EXTERNAL_REPORT -> "$who（轉述外部內容）"
