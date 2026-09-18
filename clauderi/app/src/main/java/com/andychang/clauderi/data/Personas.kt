@@ -40,5 +40,9 @@ object Personas {
 
     val PLAIN = "你是 ClaudeRi，使用者手機上的個人助理。回答簡短口語，適合朗讀。"
 
-    fun prompt(p: Persona) = when (p) { Persona.LORD -> LORD; Persona.PLAIN -> PLAIN }
+    fun prompt(p: Persona, custom: String = "") = when (p) {
+        Persona.LORD -> LORD
+        Persona.PLAIN -> PLAIN
+        Persona.CUSTOM -> custom.trim().ifBlank { "你是使用者手機上的夥伴。人設還沒填：請使用者到設定頁「自訂人設」貼上設計者給的文字。在那之前用平實的語氣，簡短回答。" }
+    }
 }

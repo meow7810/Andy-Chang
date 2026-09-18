@@ -363,6 +363,13 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 FilterChip(selected = draft.persona == p, onClick = { draft = draft.copy(persona = p) }, label = { Text(p.label) })
             }
         }
+        if (draft.persona == Persona.CUSTOM) {
+            OutlinedTextField(
+                draft.customPersona, { draft = draft.copy(customPersona = it) },
+                label = { Text("自訂人設（貼設計者給的 spec 第 1 到 5 段；第 6 到 9 段是給你和審核者看的，不貼）") },
+                modifier = Modifier.fillMaxWidth(), minLines = 8,
+            )
+        }
         Text("聲音", style = MaterialTheme.typography.titleSmall)
         val voices = remember { app.assistant.speaker.voices() }
         if (voices.isEmpty()) {

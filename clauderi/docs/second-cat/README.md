@@ -8,6 +8,10 @@
 - **飼主**：Andy。只做設計者指定的日常互動，不改 persona、不改記憶、不解釋理念。
 - **審核者**：同一個設計者，每月一次讀 archive 摘錄，判斷飼主有沒有干預、角色有沒有偏離。
 
+怎麼裝：第二隻是同一份程式碼的另一個 build flavor。Android Studio 左下 Build Variants 選 `secondDebug`，裝出來是另一個 app（名稱「第二隻」，套件名多 `.second`），
+儲存空間、設定、貓糧帳本和 Lord Claude 完全分開。裝好後它預設是「自訂人設」，把 `spec.md` 第 1 到 5 段貼進設定頁的自訂人設欄位；第 6 到 9 段不貼。
+API key 要在第二隻裡再填一次（設定不共用）。匯出養成資料包時，第二隻匯出的就是它自己的全部。
+
 檔案：
 - `DESIGN_PROMPT.md`：一次性，給設計者生出 persona、規則、每日互動要求、成功標準。輸出存成 `spec.md`，provenance 標設計者和日期。
 - `AUDIT_PROMPT.md`：每月一次，給審核者對照 `spec.md` 和 archive 摘錄寫報告。

@@ -16,6 +16,23 @@ android {
         versionName = "0.1.0"
     }
 
+    // Two cats, one code base, two installs. "lord" is Lord Claude; "second" is the cat designed
+    // by an outside AI (docs/second-cat). Separate applicationId = separate storage, icon and
+    // settings, so neither can see the other's archive. Pick the variant in Android Studio.
+    flavorDimensions += "cat"
+    productFlavors {
+        create("lord") {
+            dimension = "cat"
+            resValue("string", "app_name", "Lord Claude !")
+        }
+        create("second") {
+            dimension = "cat"
+            applicationIdSuffix = ".second"
+            versionNameSuffix = "-second"
+            resValue("string", "app_name", "第二隻")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -28,7 +45,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     packaging {
         resources {
             excludes += setOf("META-INF/INDEX.LIST", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")

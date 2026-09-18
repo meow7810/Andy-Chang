@@ -91,7 +91,7 @@ object Bundle {
 
     /** Settings worth carrying: who he is and how he is run. No keys, no grants, no device paths. */
     fun settingsJson(c: AppSettings): JSONObject = JSONObject()
-        .put("persona", c.persona.name).put("stance", c.stance).put("customInstructions", c.customInstructions)
+        .put("persona", c.persona.name).put("customPersona", c.customPersona).put("stance", c.stance).put("customInstructions", c.customInstructions)
         .put("llm", c.llm.name).put("claudeModel", c.claudeModel).put("openAiChatModel", c.openAiChatModel)
         .put("deepSeekModel", c.deepSeekModel).put("qwenModel", c.qwenModel).put("geminiModel", c.geminiModel).put("customModel", c.customModel)
         .put("historyTurns", c.historyTurns).put("longTermMemory", c.longTermMemory)
@@ -101,6 +101,7 @@ object Bundle {
 
     fun applySettings(c: AppSettings, o: JSONObject): AppSettings = c.copy(
         persona = o.optString("persona", c.persona.name).let { n -> Persona.entries.firstOrNull { it.name == n } ?: c.persona },
+        customPersona = o.optString("customPersona", c.customPersona),
         stance = o.optString("stance", c.stance),
         customInstructions = o.optString("customInstructions", c.customInstructions),
         llm = o.optString("llm", c.llm.name).let { n -> LlmBackend.entries.firstOrNull { it.name == n } ?: c.llm },

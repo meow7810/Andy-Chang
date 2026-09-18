@@ -16,7 +16,10 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clauderi_settings")
 
-enum class Persona(val label: String) { LORD("克勞德大人"), PLAIN("一般助理") }
+/** The "second" flavor is born without a persona: the outside designer's text goes into Persona.CUSTOM. */
+fun defaultPersona(): Persona = if (com.andychang.clauderi.BuildConfig.FLAVOR == "second") Persona.CUSTOM else Persona.LORD
+
+enum class Persona(val label: String) { LORD("克勞德大人"), PLAIN("一般助理"), CUSTOM("自訂人設") }
 enum class SttBackend(val label: String) { OPENAI("OpenAI gpt-4o-transcribe"), ANDROID("Android 內建（免費）") }
 enum class LlmBackend(val label: String) { CLAUDE("Claude"), GEMINI("Gemini"), OPENAI("OpenAI"), DEEPSEEK("DeepSeek"), QWEN("Qwen"), CUSTOM("自訂") }
 
@@ -67,7 +70,8 @@ data class AppSettings(
     val notificationApps: Set<String> = emptySet(), // package names allowed for capability NOTIFICATIONS
     val readNotificationsAloud: Boolean = true,
     val allowAiCapabilityRequests: Boolean = true,  // model may ask (in chat) to enable a capability; user still confirms
-    val persona: Persona = Persona.LORD,
+    val persona: Persona = defaultPersona(),
+    val customPersona: String = "",                 // Persona.CUSTOM: the character text itself (e.g. spec.md sections 1-5 from an outside designer)
     val longTermMemory: Boolean = true,             // fold old turns into a curated memory file; off = sliding window only
     val memoryModel: String = "claude-haiku-4-5",   // compaction is bookkeeping, not reasoning: use the cheap model
     val memoryUseBatch: Boolean = true,             // Claude only: Batch API, half price, applied on a later turn
@@ -125,7 +129,8 @@ class Settings(private val context: Context) {
             notificationApps = p[K.notificationApps] ?: emptySet(),
             readNotificationsAloud = p[K.readNotificationsAloud] ?: true,
             allowAiCapabilityRequests = p[K.allowAiRequests] ?: true,
-            persona = p[K.persona]?.let { runCatching { Persona.valueOf(it) }.getOrNull() } ?: Persona.LORD,
+            persona = p[K.persona]?.let { runCatching { Persona.valueOf(it) }.getOrNull() } ?: defaultPersona(),
+            customPersona = p[K.customPersona] ?: "",
             longTermMemory = p[K.longTermMemory] ?: true,
             memoryModel = p[K.memoryModel] ?: "claude-haiku-4-5",
             memoryUseBatch = p[K.memoryUseBatch] ?: true,
@@ -181,6 +186,7 @@ class Settings(private val context: Context) {
             p[K.readNotificationsAloud] = next.readNotificationsAloud
             p[K.allowAiRequests] = next.allowAiCapabilityRequests
             p[K.persona] = next.persona.name
+            p[K.customPersona] = next.customPersona
             p[K.longTermMemory] = next.longTermMemory
             p[K.memoryModel] = next.memoryModel
             p[K.memoryUseBatch] = next.memoryUseBatch
@@ -236,6 +242,7 @@ class Settings(private val context: Context) {
         val readNotificationsAloud = booleanPreferencesKey("read_notifications_aloud")
         val allowAiRequests = booleanPreferencesKey("allow_ai_requests")
         val persona = stringPreferencesKey("persona")
+        val customPersona = stringPreferencesKey("custom_persona")
         val longTermMemory = booleanPreferencesKey("long_term_memory")
         val memoryModel = stringPreferencesKey("memory_model")
         val memoryUseBatch = booleanPreferencesKey("memory_use_batch")
