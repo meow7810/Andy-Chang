@@ -21,7 +21,7 @@ class OpenAiChatProvider(
     private val baseUrl: String = OPENAI_BASE_URL,
     override val id: String = "openai",
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS).build(),
+        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build(),
 ) : ChatProvider {
 
     override suspend fun reply(

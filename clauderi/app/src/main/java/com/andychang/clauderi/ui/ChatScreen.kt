@@ -118,6 +118,13 @@ fun ChatScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         if (state is AssistantState.Listening || state is AssistantState.Transcribing || state is AssistantState.Thinking) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
+        if (state is AssistantState.Thinking) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("一題最多等兩分半，逾時自動放棄。", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { app.assistant.cancelTurn() }) { Text("取消") }
+            }
+        }
         (state as? AssistantState.Error)?.let {
             Text(it.message, color = Color(0xFFFF8A80), modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
         }

@@ -46,7 +46,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
@@ -90,6 +92,7 @@ class AssistantEngine(
     private val androidStt = AndroidSpeechToText(context)
     private val turnMutex = Mutex()
     private var voiceJob: Job? = null
+    private var turnJob: Job? = null
 
     private val _state = MutableStateFlow<AssistantState>(AssistantState.Idle)
     val state: StateFlow<AssistantState> = _state.asStateFlow()
@@ -159,15 +162,28 @@ class AssistantEngine(
 
     fun consumeVoiceDraft() { _voiceDraft.value = null }
 
-    /** Final send from the input box (typed, or a confirmed / auto-sent voice transcript). */
+    /**
+     * Final send from the input box (typed, or a confirmed / auto-sent voice transcript).
+     * One turn at a time: a send while a turn is still running is refused, not queued. Queuing was
+     * how three taps on a bad connection turned into three minutes of "思考中" nobody could stop.
+     */
     fun send(text: String, source: Source) {
         val clean = text.trim()
         if (clean.isEmpty()) return
-        scope.launch {
+        if (turnMutex.isLocked) { _state.value = AssistantState.Error("上一題還在跑。等它回來，或按「取消」再送。"); return }
+        turnJob = scope.launch {
             val cfg = settings.current()
             val speak = if (source == Source.VOICE) cfg.speakVoiceReplies else cfg.speakTextReplies
             runLlmTurn(clean, source, speak, cfg)
         }
+    }
+
+    /** Stop the running turn. The question stays in the archive; the reply slot gets an error line. */
+    fun cancelTurn() {
+        turnJob?.cancel()
+        turnJob = null
+        speaker.stop()
+        _state.value = AssistantState.Idle
     }
 
     /**
@@ -281,12 +297,19 @@ class AssistantEngine(
             put("persona", cfg.persona.name)
         }.toString()
         val reply = try {
-            llm.reply(
-                systemPrompt = { buildSystemPrompt(settings.current()) },
-                history = store.recentTurns(cfg.historyTurns, brain = llm.id, includeTest = cfg.testMode),
-                tools = { capabilities.tools(settings.current()) + extraTools },
-                executor = executor,
-            )
+            // Hard ceiling per turn, whatever the provider's own timeouts and retries add up to.
+            withTimeout(TURN_TIMEOUT_MS) {
+                llm.reply(
+                    systemPrompt = { buildSystemPrompt(settings.current()) },
+                    history = store.recentTurns(cfg.historyTurns, brain = llm.id, includeTest = cfg.testMode),
+                    tools = { capabilities.tools(settings.current()) + extraTools },
+                    executor = executor,
+                )
+            }
+        } catch (e: CancellationException) {
+            store.append(Role.ASSISTANT, "（已取消。）", source, error = true, contextRef = contextRef, prov = "app")
+            _state.value = AssistantState.Idle
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "llm failed", e)
             store.append(Role.ASSISTANT, "（回覆失敗：${e.message}）", source, error = true, contextRef = contextRef,
@@ -407,5 +430,6 @@ class AssistantEngine(
         private const val TAG = "AssistantEngine"
         private const val SILENCE = "…"
         private const val MAX_PHOTO_EVENTS_PER_DAY = 20
+        private const val TURN_TIMEOUT_MS = 150_000L
     }
 }
