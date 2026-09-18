@@ -322,7 +322,7 @@ class AssistantEngine(
             _state.value = AssistantState.Error("AI 回覆失敗：${e.message}")
             return@withLock
         }
-        reply.usage?.let { ledger.record(if (proactive) "photo" else "chat", llm.id, modelName(cfg), it) }
+        reply.usage?.let { ledger.record(if (proactive) "photo" else if (cfg.testMode) "test" else "chat", llm.id, modelName(cfg), it) }
         // Silence is a valid answer to an event: an empty reply, or nothing but the ellipsis and punctuation.
         val silent = proactive && reply.text.trim().trim('「', '」', '。', '.', ' ', '…', '(', ')', '（', '）').isEmpty()
         val replyText = if (silent) "（看了，沒說話。）" else Traditionalizer.convert(appContext, reply.text).ifBlank { "（本座無話可說。）" }
