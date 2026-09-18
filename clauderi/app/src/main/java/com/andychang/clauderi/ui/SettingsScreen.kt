@@ -321,7 +321,7 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text("測試模式")
-                Text("開著的時候說的話都標成「測試」：留在檔案裡，但他之後看不到（不進視窗、不進搜尋、不進記憶）。做回憶測試時開，測完關，測試題就不會污染下一次。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text("開著的時候說的話都標成「測試」：測試期間他照常看得到、可以連著問；關掉之後這些話就從他眼前消失（不進視窗、不進搜尋、不進記憶）。做回憶測試時開，測完關，測試題就不會污染下一次。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             Switch(checked = draft.testMode, onCheckedChange = { draft = draft.copy(testMode = it) })
         }

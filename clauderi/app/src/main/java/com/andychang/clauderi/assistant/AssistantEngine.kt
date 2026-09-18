@@ -274,7 +274,7 @@ class AssistantEngine(
         // What the model is about to be shown: the history window, the memory text, the model.
         // Recorded on the reply so "why did it say that" can be answered later.
         val contextRef = JSONObject().apply {
-            store.windowIds(cfg.historyTurns)?.let { (a, b) -> put("from", a).put("to", b) }
+            store.windowIds(cfg.historyTurns, includeTest = cfg.testMode)?.let { (a, b) -> put("from", a).put("to", b) }
             put("turns", cfg.historyTurns)
             if (cfg.longTermMemory) put("memSha", ConversationStore.sha256(memory.text.value).take(16))
             put("model", llm.id + ":" + modelName(cfg))
@@ -283,7 +283,7 @@ class AssistantEngine(
         val reply = try {
             llm.reply(
                 systemPrompt = { buildSystemPrompt(settings.current()) },
-                history = store.recentTurns(cfg.historyTurns, brain = llm.id),
+                history = store.recentTurns(cfg.historyTurns, brain = llm.id, includeTest = cfg.testMode),
                 tools = { capabilities.tools(settings.current()) + extraTools },
                 executor = executor,
             )

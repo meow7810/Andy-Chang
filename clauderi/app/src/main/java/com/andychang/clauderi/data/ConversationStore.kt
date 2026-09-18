@@ -210,8 +210,8 @@ class ConversationStore(context: Context) {
      * typed one, and a reply written by a previous brain ([brain] = the current provider id) from
      * its own. Without these marks a swapped-in model reads the whole window as itself.
      */
-    fun recentTurns(turns: Int, brain: String = ""): List<ChatTurn> =
-        window(turns).map { ChatTurn(it.role, markedText(it, brain)) }
+    fun recentTurns(turns: Int, brain: String = "", includeTest: Boolean = false): List<ChatTurn> =
+        window(turns, includeTest).map { ChatTurn(it.role, markedText(it, brain)) }
 
     private fun markedText(m: ChatMessage, brain: String): String = when {
         m.role == Role.USER && m.source == Source.VOICE -> "$VOICE_MARK" + m.text
@@ -220,10 +220,17 @@ class ConversationStore(context: Context) {
     }
 
     /** The ids the model will see for [turns], so the assistant's reply can record what it was shown. */
-    fun windowIds(turns: Int): Pair<Long, Long>? =
-        window(turns).let { w -> if (w.isEmpty()) null else w.first().id to w.last().id }
+    fun windowIds(turns: Int, includeTest: Boolean = false): Pair<Long, Long>? =
+        window(turns, includeTest).let { w -> if (w.isEmpty()) null else w.first().id to w.last().id }
 
-    private fun window(turns: Int) = _messages.value.filter { !it.hidden }.takeLast(turns)
+    /**
+     * TEST lines are hidden from the window once test mode is off. While it is on ([includeTest]),
+     * the model sees the test conversation like any other, so a multi-turn test works and the
+     * question being asked right now always reaches the model (providers require the last turn
+     * to be the user's). Search and compaction never see TEST lines either way.
+     */
+    private fun window(turns: Int, includeTest: Boolean) =
+        _messages.value.filter { !it.error && !it.deleted && (includeTest || it.statement != StatementType.TEST) }.takeLast(turns)
 
     // ------------------------------------------------------------------ file format
 
