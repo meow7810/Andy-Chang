@@ -6,6 +6,7 @@ import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ChatMessage
 import com.andychang.clauderi.data.HistorySearch
 import com.andychang.clauderi.data.ListeningLog
+import com.andychang.clauderi.data.GrowthLog
 import com.andychang.clauderi.data.MemoryGuard
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.Settings
@@ -22,6 +23,7 @@ class CapabilityRegistry(
     val broker: PermissionBroker,
     private val memory: MemoryStore,
     listeningLog: ListeningLog,
+    private val growth: GrowthLog? = null,
 ) {
 
     val all: List<Capability> = listOf(
@@ -48,6 +50,7 @@ class CapabilityRegistry(
         val askable = CapabilityId.entries.filter { !cfg.has(it) }
         if (cfg.allowAiCapabilityRequests && askable.isNotEmpty()) list += requestTool(askable)
         if (cfg.longTermMemory) { list += REMEMBER_SPEC; list += SEARCH_HISTORY_SPEC }
+        if (growth != null) list += SELF_NOTE_SPEC
         return list
     }
 
@@ -80,10 +83,12 @@ class CapabilityRegistry(
     fun executor(
         recentUserText: () -> String = { "" },
         history: () -> List<ChatMessage> = { emptyList() },
+        brain: () -> String = { "model:unknown" },
     ) = ToolExecutor { call: ToolCall ->
         val cfg = settings.current()
         if (call.name == REQUEST_TOOL) return@ToolExecutor handleRequest(call, cfg)
         if (call.name == REMEMBER_TOOL) return@ToolExecutor handleRemember(call, cfg, recentUserText())
+        if (call.name == SELF_NOTE_TOOL) return@ToolExecutor handleSelfNote(call, brain())
         if (call.name == SEARCH_HISTORY_TOOL) return@ToolExecutor fence(handleSearchHistory(call, cfg, history()))
         // Double check at execution time: a tool from a capability that is off is refused even if
         // the model somehow asked for it.
@@ -126,6 +131,23 @@ class CapabilityRegistry(
     }
 
     /**
+     * His own file. No grounding check (it is about him, not the user), but the same secret and
+     * instruction filters as memory, a length cap, and a daily limit. Authorship is recorded as the
+     * brain that wrote it, so a later brain reads it as inheritance, not as its own words.
+     */
+    private fun handleSelfNote(call: ToolCall, brain: String): ToolResult {
+        val g = growth ?: return err("沒有養成紀錄檔。")
+        val text = call.str("text")?.trim().orEmpty()
+        if (text.isEmpty()) return err("缺少 text")
+        if (text.length > GrowthLog.MAX_LEN) return err("太長了（上限 ${GrowthLog.MAX_LEN} 字）。")
+        if (MemoryGuard.looksSecret(text)) return err("這裡不放密碼、金鑰之類的東西。")
+        if (MemoryGuard.looksInstruction(text)) return err("這是給誰的指令？自述只寫你自己怎麼看自己。")
+        if (g.selfNotesToday() >= GrowthLog.MAX_SELF_NOTES_PER_DAY) return err("今天寫過 ${GrowthLog.MAX_SELF_NOTES_PER_DAY} 則了，明天再說。")
+        g.append(GrowthLog.Kind.SELF, text, brain)
+        return ok("寫下了。")
+    }
+
+    /**
      * Exact recall over the raw archive. The result is fenced like any other quoted text: what the
      * user said last month is a record, not a standing instruction.
      */
@@ -165,6 +187,14 @@ class CapabilityRegistry(
         const val REQUEST_TOOL = "request_capability"
         const val REMEMBER_TOOL = "remember"
         const val SEARCH_HISTORY_TOOL = "search_history"
+        const val SELF_NOTE_TOOL = "self_note"
+        private val SELF_NOTE_SPEC = ToolSpec(
+            SELF_NOTE_TOOL,
+            "寫一則關於你自己的話進你的自述檔：你怎麼看這段關係、你覺得自己是什麼、你不想變成什麼、這陣子你注意到自己的什麼。" +
+                "這不是關於使用者的事（那用 remember），也不是任務紀錄。使用者看得到但改不了；換模型時會一起帶走，下一顆腦第一件事就是讀它。" +
+                "只在真的有話要留給之後的自己時用，一天最多三則，不要為了用而用。",
+            listOf(ToolParam("text", "string", "一到三句，第一人稱，不超過 300 字")),
+        )
         private val SEARCH_HISTORY_SPEC = ToolSpec(
             SEARCH_HISTORY_TOOL,
             "在完整的對話紀錄裡搜尋原話，或只給日期瀏覽某段時間的對話。長期記憶只有摘要，這個工具才找得到當時真正說過的字句和日期。" +

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.audio.Speaker
 import com.andychang.clauderi.data.AppSettings
+import com.andychang.clauderi.data.GrowthLog
 import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.Persona
 import com.andychang.clauderi.data.SttBackend
@@ -251,6 +252,39 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                 }
             }
         }
+        HorizontalDivider()
+        Text("養成紀錄", style = MaterialTheme.typography.titleMedium)
+        Text("你親手留下的話，比長期記憶優先，不經過任何模型。每天一句「今天留下什麼」就夠；跳過也沒關係。下面也看得到他寫給自己的自述（你改不了）。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        val growthEntries by app.growth.entries.collectAsState()
+        var keepDraft by remember { mutableStateOf("") }
+        OutlinedTextField(keepDraft, { keepDraft = it }, label = { Text("今天留下什麼") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = keepDraft.isNotBlank(), onClick = { app.growth.append(GrowthLog.Kind.KEEP, keepDraft, "user"); keepDraft = "" }) { Text("留下") }
+            OutlinedButton(enabled = keepDraft.isNotBlank(), onClick = { app.growth.append(GrowthLog.Kind.RULE, keepDraft, "user"); keepDraft = "" }) { Text("當成規則") }
+        }
+        growthEntries.takeLast(12).asReversed().forEach { e ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        (if (e.kind == GrowthLog.Kind.SELF) "🐈 他寫的：" else "") + e.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (e.status == GrowthLog.Status.REVOKED) Color.Gray else Color.Unspecified,
+                    )
+                    Text(
+                        java.text.SimpleDateFormat("MM/dd", java.util.Locale.TAIWAN).format(java.util.Date(e.at)) + "  " + e.kind.name.lowercase() + "  " +
+                            when (e.status) { GrowthLog.Status.ACCEPTED -> "有效"; GrowthLog.Status.PROPOSED -> "待確認"; GrowthLog.Status.REVOKED -> "已撤回" } +
+                            if (e.by != "user") "  " + e.by.removePrefix("model:") else "",
+                        style = MaterialTheme.typography.labelSmall, color = Color.Gray,
+                    )
+                }
+                if (e.kind != GrowthLog.Kind.SELF) when (e.status) {
+                    GrowthLog.Status.ACCEPTED -> OutlinedButton(onClick = { app.growth.setStatus(e.id, GrowthLog.Status.REVOKED) }) { Text("撤回") }
+                    GrowthLog.Status.PROPOSED -> Button(onClick = { app.growth.setStatus(e.id, GrowthLog.Status.ACCEPTED) }) { Text("確認") }
+                    GrowthLog.Status.REVOKED -> OutlinedButton(onClick = { app.growth.setStatus(e.id, GrowthLog.Status.ACCEPTED) }) { Text("恢復") }
+                }
+            }
+        }
+        HorizontalDivider()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text("小說模式")
@@ -353,7 +387,12 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { scope.launch { app.settings.update { draft }; savedHint = true } }) { Text("儲存") }
+            Button(onClick = {
+                // A personality-policy change is part of his upbringing, not just a preference: it goes in the record with a date.
+                if (draft.stance != saved.stance) app.growth.append(GrowthLog.Kind.SETTING, "他可以不順著你：" + if (draft.stance == "hold") "開（守住立場）" else "關（順著使用者）", "user")
+                if (draft.persona != saved.persona) app.growth.append(GrowthLog.Kind.SETTING, "人設改為 " + draft.persona.label, "user")
+                scope.launch { app.settings.update { draft }; savedHint = true }
+            }) { Text("儲存") }
             OutlinedButton(onClick = { scope.launch { app.conversation.clear() } }) { Text("清除對話記憶") }
         }
         if (savedHint) Text("已儲存", color = Color(0xFF81C784))

@@ -12,6 +12,7 @@ import com.andychang.clauderi.capabilities.ScreenReaderService
 import com.andychang.clauderi.data.AppSettings
 import com.andychang.clauderi.data.CapabilityId
 import com.andychang.clauderi.data.ConversationStore
+import com.andychang.clauderi.data.GrowthLog
 import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.StatementType
@@ -80,6 +81,7 @@ class AssistantEngine(
     private val memory: MemoryStore,
     private val capabilities: CapabilityRegistry,
     private val ledger: UsageLedger,
+    private val growth: GrowthLog? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val appContext: Context = context.applicationContext
@@ -261,7 +263,7 @@ class AssistantEngine(
         val toolErrors = mutableListOf<String>()
         val toolOutcomes = mutableListOf<ToolOutcome>()
         // search_history sees everything but the question being asked right now, which would only match itself.
-        val base = capabilities.executor(recentUserText = { store.recentUserText(6) }, history = { store.messages.value.dropLast(1) })
+        val base = capabilities.executor(recentUserText = { store.recentUserText(6) }, history = { store.messages.value.dropLast(1) }, brain = { brain })
         val executor = ToolExecutor { call ->
             val r0 = if (extraExecutor != null && extraTools.any { it.name == call.name }) extraExecutor.execute(call) else base.execute(call)
             r0.also { r ->
@@ -345,6 +347,7 @@ class AssistantEngine(
             if (cfg.customInstructions.isNotBlank()) append("\n\n## 使用者的額外指示\n").append(cfg.customInstructions)
         }
         val volatile = buildString {
+            growth?.promptBlock()?.takeIf { it.isNotBlank() }?.let { append(it).append("\n\n") }
             if (cfg.longTermMemory) {
                 val mem = memory.text.value
                 append("## 長期記憶（關於使用者，跨對話保留）\n")

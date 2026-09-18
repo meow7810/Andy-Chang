@@ -7,6 +7,7 @@ import com.andychang.clauderi.capabilities.ListeningWatcher
 import com.andychang.clauderi.capabilities.PermissionBroker
 import com.andychang.clauderi.capabilities.PhotoWatcher
 import com.andychang.clauderi.data.ConversationStore
+import com.andychang.clauderi.data.GrowthLog
 import com.andychang.clauderi.data.ListeningLog
 import com.andychang.clauderi.data.MemoryStore
 import com.andychang.clauderi.data.Settings
@@ -20,6 +21,7 @@ class ClaudeRiApp : Application() {
     lateinit var memory: MemoryStore; private set
     lateinit var listening: ListeningLog; private set
     lateinit var usage: UsageLedger; private set
+    lateinit var growth: GrowthLog; private set
     lateinit var capabilities: CapabilityRegistry; private set
     lateinit var assistant: AssistantEngine; private set
 
@@ -30,9 +32,10 @@ class ClaudeRiApp : Application() {
         memory = MemoryStore(this)
         listening = ListeningLog(this)
         usage = UsageLedger(this)
+        growth = GrowthLog(this)
         ListeningWatcher.log = listening
-        capabilities = CapabilityRegistry(this, settings, PermissionBroker(), memory, listening)
-        assistant = AssistantEngine(this, settings, conversation, memory, capabilities, usage)
+        capabilities = CapabilityRegistry(this, settings, PermissionBroker(), memory, listening, growth)
+        assistant = AssistantEngine(this, settings, conversation, memory, capabilities, usage, growth)
         assistant.start()
         PhotoWatcher.onPhoto = { jpeg, origin -> assistant.onPhoto(jpeg, origin) }
         PhotoWatcher.start(this)
