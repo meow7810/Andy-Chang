@@ -61,6 +61,12 @@ class MemoryStore(context: Context) {
         save(_text.value, summarizedUpTo, pendingJob, pendingUpTo)
     }
 
+    /** Re-read the file after it was replaced from a bundle. */
+    suspend fun reload() = mutex.withLock {
+        val s = load()
+        _text.value = s.text; summarizedUpTo = s.upTo; pendingJob = s.job; pendingUpTo = s.pendingUpTo; interpreter = s.interpreter
+    }
+
     suspend fun clear() = mutex.withLock {
         _text.value = ""
         summarizedUpTo = 0

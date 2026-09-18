@@ -41,6 +41,9 @@ class UsageLedger(context: Context) {
 
     fun all(): List<Entry> = synchronized(lock) { load().toList() }
 
+    /** Drop the in-memory copy after the file was replaced from a bundle. */
+    fun reload() = synchronized(lock) { cache = null }
+
     /** Entries since the first of this month (local time). */
     fun thisMonth(): List<Entry> {
         val start = Calendar.getInstance().apply {

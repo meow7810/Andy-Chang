@@ -141,6 +141,9 @@ class ConversationStore(context: Context) {
         _messages.value = emptyList()
     }
 
+    /** Re-read the file after it was replaced from a bundle (the bundle verified the chain first). */
+    suspend fun reload() = mutex.withLock { _messages.value = load() }
+
     /** Copies the file out verbatim (header first if the file predates it). The export IS the format. */
     suspend fun exportTo(out: OutputStream) = mutex.withLock {
         out.bufferedWriter().use { w ->

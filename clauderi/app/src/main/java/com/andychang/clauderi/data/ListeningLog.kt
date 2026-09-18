@@ -25,6 +25,9 @@ class ListeningLog(context: Context) {
 
     fun all(): List<Play> = synchronized(lock) { load().toList() }
 
+    /** Drop the in-memory copy after the file was replaced from a bundle. */
+    fun reload() = synchronized(lock) { cache = null }
+
     fun append(p: Play) = synchronized(lock) {
         load().add(p)
         file.appendText(toJson(p).toString() + "\n")

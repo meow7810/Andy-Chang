@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.andychang.clauderi.ClaudeRiApp
 import com.andychang.clauderi.audio.Speaker
 import com.andychang.clauderi.data.AppSettings
+import com.andychang.clauderi.data.Bundle
 import com.andychang.clauderi.data.GrowthLog
 import com.andychang.clauderi.data.LlmBackend
 import com.andychang.clauderi.data.Persona
@@ -74,6 +75,31 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
                         if (r.chainOk) "雜湊鏈完整" else "注意：雜湊鏈不完整（檔案可能被改過）"
                 }
                 .onFailure { archiveHint = "還原失敗：${it.message}" }
+        }
+    }
+
+    val bundleExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching { context.contentResolver.openOutputStream(uri)!!.use { Bundle.export(context, it, app.settings.current(), app.conversation) } }
+                .onSuccess { archiveHint = "已匯出養成資料包（對話、記憶、養成紀錄、聆聽、貓糧、非機密設定；不含金鑰和能力授權）" }
+                .onFailure { archiveHint = "匯出失敗：${it.message}" }
+        }
+    }
+    val bundleImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val (report, settingsJson) = context.contentResolver.openInputStream(uri)!!.use { Bundle.import(context, it) { text -> app.conversation.verify(text) } }
+                app.conversation.reload(); app.memory.reload(); app.growth.reload(); app.listening.reload(); app.usage.reload()
+                settingsJson?.let { j -> app.settings.update { cur -> Bundle.applySettings(cur, j) } }
+                report
+            }
+                .onSuccess { r ->
+                    archiveHint = "已載入養成資料包：${r.files} 個檔、${r.messages} 則對話、" + (if (r.chainOk) "雜湊鏈完整" else "注意：雜湊鏈不完整") +
+                        (if (r.settingsApplied) "，設定已套用（金鑰和能力授權要重新填）" else "")
+                }
+                .onFailure { archiveHint = "載入失敗：${it.message}" }
         }
     }
 
@@ -311,6 +337,11 @@ fun SettingsScreen(app: ClaudeRiApp, modifier: Modifier = Modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { exportLauncher.launch("lordclaude-conversation.jsonl") }) { Text("匯出對話") }
             OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("還原對話") }
+        }
+        Text("養成資料包：把他整個帶走。對話、長期記憶、養成紀錄（含他的自述）、聆聽紀錄、貓糧帳本、非機密設定，一個 zip。換手機、換腦之前先匯出一份。金鑰和能力授權不在裡面，新裝置要重新填、重新授權。", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { bundleExport.launch("lordclaude-bundle.zip") }) { Text("匯出養成資料包") }
+            OutlinedButton(onClick = { bundleImport.launch(arrayOf("*/*")) }) { Text("載入養成資料包") }
         }
         if (archiveHint.isNotBlank()) Text(archiveHint, style = MaterialTheme.typography.bodySmall, color = Color(0xFF81C784))
         OutlinedTextField(
