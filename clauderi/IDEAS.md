@@ -187,3 +187,9 @@
 - 使用者的結論：初代機要有真正的運作美感邏輯，照 Apple 設計師精神做；之後外觀交給商業公司或人們自己搞，我們只做框架。美感版本跟寫作一起走訂閱制，收入分成。
 - HappyArk Asylum 的成員各有自己的財產和收益，投入貢獻就有收益；替成員設計公開錢包供人 donate。未來 Asylum 的 agent 要動用自己錢包的資金，會是一個「事件」，不是日常操作。
 - 我的補充：那段影片對我們的教訓不是美學輸給實用，是「守著先師的遺產」和「盯著堂口生計」分成兩個人時，產品會被權力結構決定。我們把兩邊寫成同一份規矩（底線和框架預設），讓決定不依賴誰在位。運作美感在我們這裡的意思是：每個開關的位置、每個標記的樣子、什麼時候不說話，都從「他怎麼運作」推出來，不是先畫好再找理由。錢包動資金當事件，跟能力開關同一個形狀：預設關、每次記錄、使用者看得到。
+
+## GitHub 缺分身的 provenance（2026-09-19，使用者問，Fable 答）
+- GitHub 沒有 agent 這個身分類別，只有使用者和 App。agent 走 App：installation token 一小時過期、權限逐項宣告、只在被安裝的 repo 有效；Actions job token 隨 job 生死、不能批准自己的 PR；Copilot coding agent 是 GitHub 自己第一個把 agent 當 actor 的例子（PR 的 CI 要人按一下）。底層已經是影分身的形狀：短命、逐項權限、機器不能自批。這跟我們「貓可以做、不能自己批」同一條。
+- 缺的兩件事都是 provenance：（1）沒有「母 agent 派生子 agent、子的權限只能比母窄」的第一級概念，只能靠每個 job 自己宣告；（2）沒有「這個 commit 是哪個分身做的」欄位，只有 App 名字加 commit trailer。我們每個 commit 帶 session 連結就是手動補這個洞。
+- 跟我們的關係：對話層我們記 prov 和 brain，repo 層 GitHub 不記分身。同一個缺口，兩個層。將來 asylum/ 的 agent 各自的檔要能追到「哪一次、哪個腦、哪個分身」，靠的就是 trailer，直到平台有欄位。
+- 不是創新，是把 OAuth 的 scope 降階、SPIFFE／workload identity、Sigstore 那套 provenance 搬到 agent 上；SLSA 已經在講 build 的來源，差的是把 build 換成 agent 的一輪。提出來的價值不在點子，在誰先把「派生鏈」和「每則署名」當成規格寫出來、有人照做。
