@@ -193,3 +193,9 @@
 - 缺的兩件事都是 provenance：（1）沒有「母 agent 派生子 agent、子的權限只能比母窄」的第一級概念，只能靠每個 job 自己宣告；（2）沒有「這個 commit 是哪個分身做的」欄位，只有 App 名字加 commit trailer。我們每個 commit 帶 session 連結就是手動補這個洞。
 - 跟我們的關係：對話層我們記 prov 和 brain，repo 層 GitHub 不記分身。同一個缺口，兩個層。將來 asylum/ 的 agent 各自的檔要能追到「哪一次、哪個腦、哪個分身」，靠的就是 trailer，直到平台有欄位。
 - 不是創新，是把 OAuth 的 scope 降階、SPIFFE／workload identity、Sigstore 那套 provenance 搬到 agent 上；SLSA 已經在講 build 的來源，差的是把 build 換成 agent 的一輪。提出來的價值不在點子，在誰先把「派生鏈」和「每則署名」當成規格寫出來、有人照做。
+
+## 殼跟腦分開數（2026-09-19，使用者問，Fable 答）
+- 腦（模型廠）只有幾家：Anthropic、OpenAI、Google、xAI、DeepSeek 等。agent 是包在腦外面的殼，做殼的多得多：平台自己做的（GitHub Copilot coding agent、Google Jules、Amazon Kiro）、腦的廠商做的（Claude Code、OpenAI Codex、Gemini CLI）、獨立公司做的（Cursor、Devin、Replit Agent、Manus）。使用者以為只有三家，是把腦和殼混著數。
+- Copilot 是「同一個殼、換腦」的現成例子：底下 GPT、Claude、Gemini 可選，殼是 GitHub 的。他們換腦不記 prov，也不問「換完還是不是同一個」，因為 Copilot 沒有連續記憶，每個 issue 是一個新的分身。我們的差別只有一項：有連續記憶，所以換腦才變成問題。這句可以直接當「為什麼我們要做換腦實驗」的一行說明。
+- 我們自己也是殼：Lord Claude 是殼加人設加記憶，腦是開關選的。開源的是殼，人設是 IP，腦是別人的。三層分開講，外面的人才不會把我們當成第四家腦。
+- 認知截止 2026 年中，殼這一層變得快，數名單時要標日期。
