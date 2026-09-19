@@ -46,6 +46,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    // Rule tests (app/src/test) run on the JVM: android.util.Log returns defaults instead of throwing.
+    testOptions { unitTests.isReturnDefaultValues = true }
     packaging {
         resources {
             excludes += setOf("META-INF/INDEX.LIST", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")
@@ -76,4 +78,9 @@ dependencies {
     implementation(libs.android.activation)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.media)
+
+    // The seven rule tests: docs/eval/README.md, first layer. No phone, no API key.
+    testImplementation(libs.junit)
+    testImplementation(libs.json)          // real org.json on the JVM; android.jar only has stubs
+    testImplementation(libs.mockito.core)  // a Context whose filesDir is a temp folder
 }

@@ -16,6 +16,8 @@
 | 兩隻貓分開 | `second` flavor 的 applicationId 有 `.second`、預設人設是 CUSTOM | `BuildConfig`、`Settings.defaultPersona` |
 | 解讀者有記 | 每筆記憶都有 `by`（誰壓的）和 `at` | `MemoryStore.save` |
 
+七條都寫在 `app/src/test/java/com/andychang/clauderi/data/RuleTests.kt`，Android Studio 裡對檔案按右鍵 Run，或終端機 `./gradlew testLordDebugUnitTest testSecondDebugUnitTest`（第 6 條要兩個 flavor 都跑才算）。
+
 這一層對應 Sol 說的「多入口洗白」：所有寫入路徑（remember、壓縮、self_note、養成包匯入）各寫一條「不能升格」的測試。寫測試要加 JUnit 依賴，`Context` 相關的用暫存目錄繞開。
 
 ## 第二層：回放（fixture 加任何腦）
