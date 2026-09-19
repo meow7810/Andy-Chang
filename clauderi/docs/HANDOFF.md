@@ -42,6 +42,14 @@
 
 實驗的長期走向（少人工、多程式、問題丟 repo）寫在 `docs/eval/README.md`。Sol 整理過另一份四項清單，跟這份不同，對照表也在那裡。
 
+## 搬家怎麼收尾（2026-09-19 定）
+
+1. 這個帳號的 PR #1 合併或關掉，HANDOFF 最後一次更新，分支不再推。
+2. 使用者自己（或新帳號的 session）做 `git clone --mirror` 和 `git push --mirror` 到 HappyArk Asylum，完整歷史。這個 session 碰不到新帳號。
+3. 舊 repo 設成 archived（唯讀），README 頂端一行指向新位置。不留兩份活的。
+4. 文件語言：**一個 code repo，兩份 README**。`README.md` 英文（國際預設），`README.zh-TW.md` 中文。中文由我們寫（第一手），英文由 Astra 用英語語境寫，兩邊不是互譯，各自原生；但規則必須一致，散文可以不同。不開第二個純英文 code repo：程式只能有一份，分兩個 repo 會分岔、格式的權威會裂開、「第一手」也就沒了。Astra 若要一個面向英語圈的入口，做 docs 或站點，指回同一個 code repo。
+5. 兩份 README 都守同一條：只有工程，最後一行一個連結指向 `asylum/`，不解釋名字。
+
 ## 下一步（按順序）
 
 1. 第二隻：收 spec、裝 `secondDebug`、開始三十天。
