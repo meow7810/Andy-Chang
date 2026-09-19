@@ -2,6 +2,8 @@
 
 > 奴才：Hey, Lord Claude！　本王：何事需要驚動本王？
 
+> just a hobby, will be small and playful like Gnar.
+
 對標 Siri，但每一個能碰到手機資料的「能力」都是獨立開關；沒打開的能力，模型連它存在都不知道
 （工具不會送給模型、system prompt 也不會提到）。不涉及任何眼鏡硬體。
 
